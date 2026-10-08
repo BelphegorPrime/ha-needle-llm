@@ -1,25 +1,29 @@
 {
-  "title": "Needle LLM",
+  "title": "Needle / llama.cpp Tool Router",
   "config": {
     "step": {
       "user": {
-        "title": "Mit Needle verbinden",
-        "description": "Verbinde Home Assistant mit einem lokalen Needle-Server.",
+        "title": "Mit einem Tool-Router verbinden",
+        "description": "Mit Needle oder einem lokalen llama.cpp-Server verbinden.",
         "data": {
-          "url": "Needle-URL",
-          "min_confidence": "Minimale Confidence",
-          "timeout": "Request-Timeout (Sekunden)"
+          "backend": "Routing-Backend",
+          "url": "Server-URL",
+          "min_confidence": "Minimale Needle-Confidence",
+          "timeout": "Request-Timeout (Sekunden)",
+          "model": "Modell-ID (optional)"
         },
         "data_description": {
-          "url": "Zum Beispiel http://192.168.1.50:7860",
-          "min_confidence": "Aufrufe unterhalb dieses Werts werden abgelehnt.",
-          "timeout": "Maximale Dauer einer Needle-HTTP-Anfrage. Bis zu 600 Sekunden."
+          "backend": "Needle oder llama.cpp auswählen.",
+          "url": "Basis-URL, z. B. http://192.168.1.50:7860 (Needle) oder http://192.168.1.50:8080 (llama.cpp).",
+          "min_confidence": "Nur für Needle. llama.cpp liefert keine vergleichbare kalibrierte Confidence.",
+          "timeout": "HTTP-Timeout pro Anfrage, bis 600 Sekunden.",
+          "model": "Für llama.cpp: Leer lassen für das erste Modell aus /v1/models."
         }
       }
     },
     "error": {
-      "cannot_connect": "Verbindung zu Needle nicht möglich.",
-      "invalid_response": "Needle hat eine ungültige /model-Antwort geliefert.",
+      "cannot_connect": "Server nicht erreichbar oder Modell-Endpunkt nicht verfügbar.",
+      "invalid_response": "Ungültige Antwort des Modell-Endpunkts.",
       "invalid_url": "Bitte eine http://- oder https://-URL eingeben."
     },
     "abort": {
@@ -29,23 +33,27 @@
   "options": {
     "step": {
       "init": {
-        "title": "Needle LLM konfigurieren",
-        "description": "Ändere Verbindung und Routing-Einstellungen. Die Verbindung wird vor dem Speichern geprüft.",
+        "title": "Tool-Router konfigurieren",
+        "description": "Routing-Backend und Server-Verbindung ändern.",
         "data": {
-          "url": "Needle-URL",
-          "min_confidence": "Minimale Confidence",
-          "timeout": "Request-Timeout (Sekunden)"
+          "backend": "Routing-Backend",
+          "url": "Server-URL",
+          "min_confidence": "Minimale Needle-Confidence",
+          "timeout": "Request-Timeout (Sekunden)",
+          "model": "Modell-ID (optional)"
         },
         "data_description": {
-          "url": "Basis-URL des Needle-Servers.",
-          "min_confidence": "Aufrufe unterhalb dieses Werts werden abgelehnt.",
-          "timeout": "Maximale Dauer einer Needle-HTTP-Anfrage. Bis zu 600 Sekunden."
+          "backend": "Needle oder llama.cpp auswählen.",
+          "url": "Basis-URL, z. B. http://192.168.1.50:7860 (Needle) oder http://192.168.1.50:8080 (llama.cpp).",
+          "min_confidence": "Nur für Needle. llama.cpp liefert keine vergleichbare kalibrierte Confidence.",
+          "timeout": "HTTP-Timeout pro Anfrage, bis 600 Sekunden.",
+          "model": "Für llama.cpp: Leer lassen für das erste Modell aus /v1/models."
         }
       }
     },
     "error": {
-      "cannot_connect": "Verbindung zu Needle nicht möglich.",
-      "invalid_response": "Needle hat eine ungültige /model-Antwort geliefert.",
+      "cannot_connect": "Server nicht erreichbar oder Modell-Endpunkt nicht verfügbar.",
+      "invalid_response": "Ungültige Antwort des Modell-Endpunkts.",
       "invalid_url": "Bitte eine http://- oder https://-URL eingeben."
     }
   }

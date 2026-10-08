@@ -1,25 +1,29 @@
 {
-  "title": "Needle LLM",
+  "title": "Needle / llama.cpp Tool Router",
   "config": {
     "step": {
       "user": {
-        "title": "Connect to Needle",
-        "description": "Connect Home Assistant to a local Needle server.",
+        "title": "Connect a tool router",
+        "description": "Connect to Needle or a local llama.cpp server.",
         "data": {
-          "url": "Needle URL",
-          "min_confidence": "Minimum confidence",
-          "timeout": "Request timeout (seconds)"
+          "backend": "Routing backend",
+          "url": "Server URL",
+          "min_confidence": "Minimum Needle confidence",
+          "timeout": "Request timeout (seconds)",
+          "model": "Model ID (optional)"
         },
         "data_description": {
-          "url": "For example http://192.168.1.50:7860",
-          "min_confidence": "Calls below this confidence are rejected.",
-          "timeout": "Maximum time for one Needle HTTP request. Up to 600 seconds."
+          "backend": "Select Needle or llama.cpp.",
+          "url": "Base URL, e.g. http://192.168.1.50:7860 (Needle) or http://192.168.1.50:8080 (llama.cpp).",
+          "min_confidence": "Needle only; llama.cpp does not provide a comparable calibrated confidence.",
+          "timeout": "HTTP timeout per request, up to 600 seconds.",
+          "model": "For llama.cpp: leave empty to use the first model from /v1/models."
         }
       }
     },
     "error": {
-      "cannot_connect": "Unable to connect to Needle.",
-      "invalid_response": "Needle returned an invalid /model response.",
+      "cannot_connect": "Server unreachable or model endpoint not available.",
+      "invalid_response": "Invalid model endpoint response.",
       "invalid_url": "Enter an http:// or https:// URL."
     },
     "abort": {
@@ -29,23 +33,27 @@
   "options": {
     "step": {
       "init": {
-        "title": "Configure Needle LLM",
-        "description": "Change connection and routing settings. The connection is validated before saving.",
+        "title": "Configure tool router",
+        "description": "Change the routing backend and server connection.",
         "data": {
-          "url": "Needle URL",
-          "min_confidence": "Minimum confidence",
-          "timeout": "Request timeout (seconds)"
+          "backend": "Routing backend",
+          "url": "Server URL",
+          "min_confidence": "Minimum Needle confidence",
+          "timeout": "Request timeout (seconds)",
+          "model": "Model ID (optional)"
         },
         "data_description": {
-          "url": "Base URL of the Needle server.",
-          "min_confidence": "Calls below this confidence are rejected.",
-          "timeout": "Maximum time for one Needle HTTP request. Up to 600 seconds."
+          "backend": "Select Needle or llama.cpp.",
+          "url": "Base URL, e.g. http://192.168.1.50:7860 (Needle) or http://192.168.1.50:8080 (llama.cpp).",
+          "min_confidence": "Needle only; llama.cpp does not provide a comparable calibrated confidence.",
+          "timeout": "HTTP timeout per request, up to 600 seconds.",
+          "model": "For llama.cpp: leave empty to use the first model from /v1/models."
         }
       }
     },
     "error": {
-      "cannot_connect": "Unable to connect to Needle.",
-      "invalid_response": "Needle returned an invalid /model response.",
+      "cannot_connect": "Server unreachable or model endpoint not available.",
+      "invalid_response": "Invalid model endpoint response.",
       "invalid_url": "Enter an http:// or https:// URL."
     }
   }

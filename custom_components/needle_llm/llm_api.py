@@ -21,7 +21,13 @@ from .compat import (
     route_parameters_schema,
     schema_to_json_schema,
 )
-from .const import DOMAIN
+from .const import (
+    BACKEND_LLAMA_CPP,
+    BACKEND_NEEDLE,
+    DEFAULT_BACKEND,
+    DOMAIN,
+)
+from .llama_client import LlamaCppClient, LlamaCppClientError
 from .routing import (
     build_discovery_tools,
     build_routing_query,
@@ -33,7 +39,11 @@ from .target_guard import (
     find_unique_mentioned_entity,
     reconcile_named_target,
 )
-from .validation import RouteRejected, approve_route
+from .validation import (
+    RouteRejected,
+    approve_llama_route,
+    approve_route,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,12 +64,14 @@ class NeedleRouteTool(llm.Tool):
 
     def __init__(
         self,
-        client: NeedleClient,
+        client: NeedleClient | LlamaCppClient,
         *,
+        backend: str,
         minimum_confidence: float,
     ) -> None:
         """Initialize the routing tool."""
         self._client = client
+        self._backend = backend
         self._minimum_confidence = minimum_confidence
 
     async def async_call(
@@ -119,155 +131,214 @@ class NeedleRouteTool(llm.Tool):
         }
 
         diagnostics = {
+            "backend": self._backend,
             "available_tool_count": len(needle_tools),
             "skipped_tool_count": len(skipped_tools),
             "skipped_tools": skipped_tools,
         }
 
-        discovery_tools = build_discovery_tools(needle_tools)
-        routed_query = build_routing_query(query)
-
-        diagnostics["routing_strategy"] = "two_stage_unique_target_schema_v5"
-
-        try:
-            discovery_result, discovery_transport = (
-                await self._client.async_complete(
-                    tools=discovery_tools,
-                    query=routed_query,
-                    stage="discovery",
+        if self._backend == BACKEND_LLAMA_CPP:
+            diagnostics["routing_strategy"] = "llama_cpp_openai_single_pass"
+            try:
+                result, transport = await self._client.async_complete(
+                    tools=needle_tools,
+                    query=query,
+                    language=llm_context.language,
                 )
-            )
-        except NeedleClientError as err:
-            return _error(
-                str(err),
-                stage=err.stage,
-                diagnostics={
-                    **diagnostics,
-                    "discovery_transport": err.as_dict(),
-                },
-            )
+            except LlamaCppClientError as err:
+                return _error(
+                    str(err),
+                    stage=err.stage,
+                    diagnostics={
+                        **diagnostics,
+                        "route_transport": err.as_dict(),
+                    },
+                )
 
-        candidates = candidate_tool_names(
-            discovery_result,
-            allowed_tools,
-            limit=3,
-        )
-        diagnostics["discovery"] = {
-            "candidate_tools": candidates,
-            "candidate_tool_count": len(candidates),
-            "transport": discovery_transport,
-            "needle": _needle_diagnostics(discovery_result),
-        }
-
-        if not candidates:
-            return _error(
-                "Needle discovery did not identify a candidate Home Assistant tool",
-                stage="discovery_validation",
-                diagnostics=diagnostics,
+            choices = result.get("choices")
+            choice = choices[0] if isinstance(choices, list) and choices else {}
+            message = choice.get("message") if isinstance(choice, dict) else {}
+            calls = (
+                message.get("tool_calls", [])
+                if isinstance(message, dict) else []
             )
-
-        # Only simplify optional targeting fields when the original utterance
-        # literally names exactly one entity exposed to this Assist assistant.
-        # No device type, translated noun, or fuzzy entity guess is assumed.
-        mentioned_entities: list[dict[str, Any]] = []
-        for state in hass.states.async_all():
-            if not async_should_expose(
-                hass, llm_context.assistant, state.entity_id
-            ):
-                continue
-            mentioned_entities.append(
-                {
-                    "name": state.name,
-                    "entity_id": state.entity_id,
-                    "device_class": state.attributes.get("device_class"),
-                }
-            )
-
-        matched_target = find_unique_mentioned_entity(
-            query, mentioned_entities
-        )
-        narrowed_tools = [
-            execution_tool(
-                tools_by_serialized_name[name],
-                unique_named_target=matched_target is not None,
-            )
-            for name in candidates
-        ]
-        removed_fields = [
-            {
-                "tool": name,
-                "fields": ["device_class"],
+            diagnostics["route"] = {
+                "query_mode": "original_user_request",
+                "transport": transport,
+                "finish_reason": (
+                    choice.get("finish_reason")
+                    if isinstance(choice, dict) else None
+                ),
+                "tool_calls": calls,
             }
-            for name, narrowed in zip(
-                candidates, narrowed_tools, strict=True
-            )
-            if "device_class"
-            in tools_by_serialized_name[name]["parameters"].get(
-                "properties", {}
-            )
-            and "device_class" not in narrowed["parameters"].get(
-                "properties", {}
-            )
-        ]
-        diagnostics["target_schema"] = {
-            "unique_exposed_name_match": matched_target is not None,
-            "matched_entity_id": (
-                matched_target["entity_id"] if matched_target else None
-            ),
-            "removed_optional_fields": removed_fields,
-        }
 
-        try:
-            # Discovery needs action-selection guidance. Once the native
-            # Assist tools have been narrowed, give Needle only the user's
-            # original request to extract target and explicitly stated values.
-            # Extra instructions can be mistaken for tool arguments.
-            result, transport = await self._client.async_complete(
-                tools=narrowed_tools,
-                query=query,
-                stage="route",
-            )
-        except NeedleClientError as err:
-            return _error(
-                str(err),
-                stage=err.stage,
-                diagnostics={
-                    **diagnostics,
-                    "route_transport": err.as_dict(),
-                },
-            )
+            try:
+                route = approve_llama_route(
+                    result,
+                    allowed_tools=allowed_tools,
+                )
+            except RouteRejected as err:
+                return make_tool_result(
+                    {
+                        "executed": False,
+                        "reason": str(err),
+                        "stage": "validation",
+                        "device_lookup_attempted": False,
+                        "guidance": (
+                            "llama.cpp did not produce an approved tool call. "
+                            "No Home Assistant action or device lookup ran."
+                        ),
+                        "diagnostics": diagnostics,
+                    },
+                    error=True,
+                )
+            matched_target = None
+            removed_fields: list[dict[str, Any]] = []
+        else:
+            discovery_tools = build_discovery_tools(needle_tools)
+            routed_query = build_routing_query(query)
 
-        diagnostics["route"] = {
-            "query_mode": "original_user_request",
-            "candidate_tools": candidates,
-            "candidate_tool_count": len(candidates),
-            "transport": transport,
-            "needle": _needle_diagnostics(result),
-        }
+            diagnostics["routing_strategy"] = "two_stage_unique_target_schema_v5"
 
-        try:
-            route = approve_route(
-                result,
-                self._minimum_confidence,
-                allowed_tools=set(candidates),
+            try:
+                discovery_result, discovery_transport = (
+                    await self._client.async_complete(
+                        tools=discovery_tools,
+                        query=routed_query,
+                        stage="discovery",
+                    )
+                )
+            except NeedleClientError as err:
+                return _error(
+                    str(err),
+                    stage=err.stage,
+                    diagnostics={
+                        **diagnostics,
+                        "discovery_transport": err.as_dict(),
+                    },
+                )
+
+            candidates = candidate_tool_names(
+                discovery_result,
+                allowed_tools,
+                limit=3,
             )
-        except RouteRejected as err:
-            return make_tool_result(
+            diagnostics["discovery"] = {
+                "candidate_tools": candidates,
+                "candidate_tool_count": len(candidates),
+                "transport": discovery_transport,
+                "needle": _needle_diagnostics(discovery_result),
+            }
+
+            if not candidates:
+                return _error(
+                    "Needle discovery did not identify a candidate Home Assistant tool",
+                    stage="discovery_validation",
+                    diagnostics=diagnostics,
+                )
+
+            # Only simplify optional targeting fields when the original utterance
+            # literally names exactly one entity exposed to this Assist assistant.
+            # No device type, translated noun, or fuzzy entity guess is assumed.
+            mentioned_entities: list[dict[str, Any]] = []
+            for state in hass.states.async_all():
+                if not async_should_expose(
+                    hass, llm_context.assistant, state.entity_id
+                ):
+                    continue
+                mentioned_entities.append(
+                    {
+                        "name": state.name,
+                        "entity_id": state.entity_id,
+                        "device_class": state.attributes.get("device_class"),
+                    }
+                )
+
+            matched_target = find_unique_mentioned_entity(
+                query, mentioned_entities
+            )
+            narrowed_tools = [
+                execution_tool(
+                    tools_by_serialized_name[name],
+                    unique_named_target=matched_target is not None,
+                )
+                for name in candidates
+            ]
+            removed_fields = [
                 {
-                    "executed": False,
-                    "reason": str(err),
-                    "confidence": result.get("confidence"),
-                    "stage": "validation",
-                    "device_lookup_attempted": False,
-                    "guidance": (
-                        "Needle did not produce an approved tool call. "
-                        "No Home Assistant action or device lookup ran. "
-                        "Do not conclude that the device is missing."
-                    ),
-                    "diagnostics": diagnostics,
-                },
-                error=True,
-            )
+                    "tool": name,
+                    "fields": ["device_class"],
+                }
+                for name, narrowed in zip(
+                    candidates, narrowed_tools, strict=True
+                )
+                if "device_class"
+                in tools_by_serialized_name[name]["parameters"].get(
+                    "properties", {}
+                )
+                and "device_class" not in narrowed["parameters"].get(
+                    "properties", {}
+                )
+            ]
+            diagnostics["target_schema"] = {
+                "unique_exposed_name_match": matched_target is not None,
+                "matched_entity_id": (
+                    matched_target["entity_id"] if matched_target else None
+                ),
+                "removed_optional_fields": removed_fields,
+            }
+
+            try:
+                # Discovery needs action-selection guidance. Once the native
+                # Assist tools have been narrowed, give Needle only the user's
+                # original request to extract target and explicitly stated values.
+                # Extra instructions can be mistaken for tool arguments.
+                result, transport = await self._client.async_complete(
+                    tools=narrowed_tools,
+                    query=query,
+                    stage="route",
+                )
+            except NeedleClientError as err:
+                return _error(
+                    str(err),
+                    stage=err.stage,
+                    diagnostics={
+                        **diagnostics,
+                        "route_transport": err.as_dict(),
+                    },
+                )
+
+            diagnostics["route"] = {
+                "query_mode": "original_user_request",
+                "candidate_tools": candidates,
+                "candidate_tool_count": len(candidates),
+                "transport": transport,
+                "needle": _needle_diagnostics(result),
+            }
+
+            try:
+                route = approve_route(
+                    result,
+                    self._minimum_confidence,
+                    allowed_tools=set(candidates),
+                )
+            except RouteRejected as err:
+                return make_tool_result(
+                    {
+                        "executed": False,
+                        "reason": str(err),
+                        "confidence": result.get("confidence"),
+                        "stage": "validation",
+                        "device_lookup_attempted": False,
+                        "guidance": (
+                            "Needle did not produce an approved tool call. "
+                            "No Home Assistant action or device lookup ran. "
+                            "Do not conclude that the device is missing."
+                        ),
+                        "diagnostics": diagnostics,
+                    },
+                    error=True,
+                )
 
         target_tool = tools_by_name.get(route.tool)
         if target_tool is None:
@@ -404,8 +475,14 @@ class NeedleRouteTool(llm.Tool):
         return make_tool_result(
             {
                 "executed": not native_error,
-                "needle_tool": route.tool,
-                "needle_confidence": route.confidence,
+                "router_backend": self._backend,
+                "selected_tool": route.tool,
+                "confidence": route.confidence,
+                **(
+                    {"needle_confidence": route.confidence}
+                    if self._backend == BACKEND_NEEDLE
+                    else {"confidence_available": False}
+                ),
                 "arguments": arguments,
                 "home_assistant": native_data,
                 "diagnostics": {
@@ -415,6 +492,7 @@ class NeedleRouteTool(llm.Tool):
                     "narrowed_to": len(candidates),
                     "selected_tool": route.tool,
                     "selected_arguments": arguments,
+                    "backend": self._backend,
                 },
             },
             error=native_error,
@@ -430,6 +508,13 @@ if hasattr(llm, "ToolAnnotations"):
     )
 
 
+class LlamaRouteTool(NeedleRouteTool):
+    """Tool exposing the llama.cpp backend without a misleading Needle name."""
+
+    name = "LlamaRoute"
+    title = "Route Home Assistant request through llama.cpp"
+
+
 class NeedleAPI(llm.API):
     """LLM API that exposes the Needle router."""
 
@@ -439,12 +524,14 @@ class NeedleAPI(llm.API):
         *,
         api_id: str,
         name: str,
-        client: NeedleClient,
+        client: NeedleClient | LlamaCppClient,
+        backend: str,
         minimum_confidence: float,
     ) -> None:
         """Initialize the API."""
         super().__init__(hass=hass, id=api_id, name=name)
         self._client = client
+        self._backend = backend
         self._minimum_confidence = minimum_confidence
 
     async def async_get_api_instance(
@@ -452,11 +539,16 @@ class NeedleAPI(llm.API):
         llm_context: llm.LLMContext,
     ) -> llm.APIInstance:
         """Return the API instance for one conversation request."""
+        tool_cls = (
+            LlamaRouteTool if self._backend == BACKEND_LLAMA_CPP
+            else NeedleRouteTool
+        )
+        tool_name = tool_cls.name
         return llm.APIInstance(
             api=self,
             api_prompt=(
                 "For any request about Home Assistant that requires current "
-                "home data or an action, call NeedleRoute. Pass the user's "
+                f"home data or an action, call {tool_name}. Pass the user's "
                 "original request unchanged. NeedleRoute delegates only to "
                 "tools provided by Home Assistant's native Assist API. Never "
                 "claim success unless the result contains executed=true. "
@@ -466,8 +558,9 @@ class NeedleAPI(llm.API):
             ),
             llm_context=llm_context,
             tools=[
-                NeedleRouteTool(
+                tool_cls(
                     self._client,
+                    backend=self._backend,
                     minimum_confidence=self._minimum_confidence,
                 )
             ],
@@ -480,11 +573,14 @@ def api_id_for_url(base_url: str) -> str:
     return f"{DOMAIN}_{digest}"
 
 
-def api_name_for_url(base_url: str) -> str:
+def api_name_for_url(
+    base_url: str, *, backend: str = DEFAULT_BACKEND
+) -> str:
     """Return a stable human-readable API name."""
     parsed = urlparse(base_url)
     location = parsed.netloc or base_url
-    return f"Needle LLM @ {location}"
+    label = "llama.cpp" if backend == BACKEND_LLAMA_CPP else "Needle LLM"
+    return f"{label} @ {location}"
 
 
 def _needle_diagnostics(result: dict[str, Any]) -> dict[str, Any]:

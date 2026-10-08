@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 - 2026-10-08
+
+- Add optional llama.cpp routing backend using OpenAI tool calling.
+- Allow backend, model ID and server URL selection in initial setup and options.
+- Keep Needle as the default and preserve all existing Needle installations.
+- Route to native Home Assistant Assist tools through a single llama.cpp call.
+- Reject malformed, unavailable or multiple tool calls before native HA
+  schema, exposure and execution checks.
+- Do not fabricate Needle confidence values for llama.cpp responses.
+- Add locale-aware server instructions and structured route diagnostics.
+
+
 ## 0.2.7 - 2026-10-08
 
 - Narrow final Needle argument schemas when the original utterance contains
