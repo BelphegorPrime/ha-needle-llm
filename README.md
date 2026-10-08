@@ -17,6 +17,18 @@ The larger model keeps responsibility for natural conversation. Needle is used
 as a compact, schema-constrained tool router. Home Assistant remains the
 authorization and execution boundary.
 
+## Companion Needle add-on
+
+This repository provides the **Home Assistant custom integration**. To
+run a local Needle server on Home Assistant OS or Supervised, install the
+[Needle add-on](https://github.com/BelphegorPrime/ha-addon-collection/tree/master/addon-needle) from the
+[Home Assistant add-on collection](https://github.com/BelphegorPrime/ha-addon-collection).
+The add-on hosts Needle; this integration makes its tool routing available to
+compatible LLM conversation agents.
+
+For an alternative without an LLM conversation agent, see the
+[add-on's custom-sentence Assist guide](https://github.com/BelphegorPrime/ha-addon-collection/blob/master/addon-needle/FULL_ASSIST_SETUP.md).
+
 > [!IMPORTANT]
 > Version 0.1.0 is an initial integration. Test it with harmless devices before
 > using it for security-sensitive actions.
