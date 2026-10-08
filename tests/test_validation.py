@@ -4,6 +4,7 @@ import pytest
 
 from custom_components.needle_llm.routing import (
     build_discovery_tools,
+    build_routing_query,
     candidate_tool_names,
     execution_tool,
 )
@@ -197,3 +198,21 @@ def test_execution_tool_restores_full_schema() -> None:
         "description": "Turn off a Home Assistant device.",
         "parameters": NARROWING_TOOLS[0]["parameters"],
     }
+
+
+
+def test_discovery_description_prefers_explicit_action_over_settings() -> None:
+    """Settings tools explain that their fields must be explicitly requested."""
+    discovery = build_discovery_tools(NARROWING_TOOLS)
+
+    assert "Action-specific inputs: volume_level" in discovery[1]["description"]
+    assert "explicitly requests" in discovery[1]["description"]
+
+
+def test_routing_query_is_operation_first() -> None:
+    """Needle receives generic operation-first routing guidance."""
+    query = build_routing_query("Schalte die Wohnzimmerlampe aus")
+
+    assert "action the user explicitly requested" in query
+    assert "Do not invent optional settings" in query
+    assert query.endswith("User request: Schalte die Wohnzimmerlampe aus")

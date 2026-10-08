@@ -21,6 +21,7 @@ from .compat import (
 from .const import DOMAIN
 from .routing import (
     build_discovery_tools,
+    build_routing_query,
     candidate_tool_names,
     execution_tool,
 )
@@ -116,12 +117,15 @@ class NeedleRouteTool(llm.Tool):
         }
 
         discovery_tools = build_discovery_tools(needle_tools)
+        routed_query = build_routing_query(query)
+
+        diagnostics["routing_strategy"] = "two_stage_operation_first_v2"
 
         try:
             discovery_result, discovery_transport = (
                 await self._client.async_complete(
                     tools=discovery_tools,
-                    query=query,
+                    query=routed_query,
                     stage="discovery",
                 )
             )
@@ -162,7 +166,7 @@ class NeedleRouteTool(llm.Tool):
         try:
             result, transport = await self._client.async_complete(
                 tools=narrowed_tools,
-                query=query,
+                query=routed_query,
                 stage="route",
             )
         except NeedleClientError as err:

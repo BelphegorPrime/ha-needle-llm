@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.4 - 2026-10-08
+
+- Make dynamic discovery operation-first instead of device-type-first.
+- Add lightweight action-parameter hints derived from each native Home
+  Assistant schema without hard-coding individual tools.
+- Tell Needle not to invent optional settings such as color, brightness,
+  volume or position when the user only requested a generic action.
+- Apply the same grounding guidance to the narrowed full-schema routing pass.
+- Add a routing strategy marker to diagnostics.
+
+
 ## 0.2.3 - 2026-10-08
 
 - Move dynamic narrowing unit tests into the established validation test module

@@ -236,11 +236,15 @@ for that request/context.
 It then uses two Needle passes:
 
 1. **Discovery:** all current tools are sent with their native names, titles and
-   descriptions, but with empty parameter schemas. This keeps the prompt small
-   and asks Needle only which capability is relevant.
+   compact operation descriptions, but with empty parameter schemas. The
+   descriptions are enriched dynamically from each native schema so Needle can
+   distinguish direct actions from device-specific settings without hard-coded
+   tool mappings.
 2. **Routing:** only the discovered candidates (up to three) are sent again with
-   their complete native Home Assistant schemas. Only this second result is
-   eligible for execution.
+   their complete native Home Assistant schemas. Both stages receive generic
+   operation-first guidance: prefer the explicitly requested action and never
+   invent optional settings such as color, brightness or volume. Only this
+   second result is eligible for execution.
 
 A low-confidence or suppressed discovery candidate is safe to use as a
 shortlist hint because discovery never executes anything. The second pass still
@@ -330,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.2.3
+0.2.4
 ```
 
 ## License
