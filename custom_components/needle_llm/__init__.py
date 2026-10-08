@@ -21,8 +21,8 @@ from .const import (
     DOMAIN,
     normalize_backend,
 )
-from .openai_client import OpenAICompatibleClient
 from .llm_api import NeedleAPI, api_id_for_url, api_name_for_url
+from .openai_client import OpenAICompatibleClient
 
 
 async def async_setup_entry(

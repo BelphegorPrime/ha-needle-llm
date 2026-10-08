@@ -22,8 +22,8 @@ from .compat import (
     schema_to_json_schema,
 )
 from .const import (
-    BACKEND_OPENAI_COMPATIBLE,
     BACKEND_NEEDLE,
+    BACKEND_OPENAI_COMPATIBLE,
     DEFAULT_BACKEND,
     DOMAIN,
 )
@@ -583,7 +583,11 @@ def api_name_for_url(
     """Return a stable human-readable API name."""
     parsed = urlparse(base_url)
     location = parsed.netloc or base_url
-    label = "OpenAI-compatible" if backend == BACKEND_OPENAI_COMPATIBLE else "Needle LLM"
+    label = (
+        "OpenAI-compatible"
+        if backend == BACKEND_OPENAI_COMPATIBLE
+        else "Needle LLM"
+    )
     return f"{label} @ {location}"
 
 

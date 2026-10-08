@@ -12,8 +12,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import NeedleClient, NeedleClientError
 from .const import (
-    BACKEND_OPENAI_COMPATIBLE,
     BACKEND_NEEDLE,
+    BACKEND_OPENAI_COMPATIBLE,
     CONF_BACKEND,
     CONF_MIN_CONFIDENCE,
     CONF_MODEL,

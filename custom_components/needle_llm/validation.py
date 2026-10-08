@@ -100,7 +100,9 @@ def approve_openai_route(
         try:
             args = json.loads(args)
         except (ValueError, TypeError) as err:
-            raise RouteRejected("OpenAI-compatible returned malformed argument JSON") from err
+            raise RouteRejected(
+                "OpenAI-compatible returned malformed argument JSON"
+            ) from err
     if not isinstance(args, dict):
         raise RouteRejected("OpenAI-compatible arguments must be a JSON object")
     return ApprovedRoute(tool=name, arguments=args, confidence=None)

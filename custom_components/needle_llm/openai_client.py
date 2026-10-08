@@ -1,4 +1,4 @@
-"""OpenAI-compatible OpenAI-compatible HTTP client for Home Assistant tool routing."""
+"""OpenAI-compatible HTTP client for Home Assistant tool routing."""
 
 from __future__ import annotations
 
@@ -23,7 +23,10 @@ class OpenAICompatibleClientError(Exception):
 
     def __str__(self) -> str:
         """Describe the error without leaking request headers."""
-        return f"OpenAI-compatible {self.stage} failed: {self.message or self.error_type}"
+        return (
+            f"OpenAI-compatible {self.stage} failed: "
+            f"{self.message or self.error_type}"
+        )
 
     def as_dict(self) -> dict[str, Any]:
         """Export transport diagnostics."""
