@@ -19,10 +19,13 @@ jobs:
         include:
           - homeassistant: "2024.7.4"
             python: "3.12"
+            compat_packages: "josepy<2"
           - homeassistant: "2025.6.3"
             python: "3.13"
+            compat_packages: ""
           - homeassistant: "2026.10.0"
             python: "3.14"
+            compat_packages: ""
 
     steps:
       - name: Check out repository
@@ -39,6 +42,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e '.[test]'
           python -m pip install "homeassistant==${{ matrix.homeassistant }}"
+          if [ -n "${{ matrix.compat_packages }}" ]; then
+            python -m pip install "${{ matrix.compat_packages }}"
+          fi
 
       - name: Ruff
         run: ruff check .
