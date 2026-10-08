@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
+import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_URL
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-import voluptuous as vol
 
 from .client import NeedleClient, NeedleClientError
 from .const import (
