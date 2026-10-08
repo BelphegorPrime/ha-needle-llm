@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ha-needle-llm"
+version = "0.1.0"
+description = "Guarded Needle LLM router for Home Assistant"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "Apache-2.0"
+authors = [
+  { name = "Marcel Rösler" }
+]
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+  "homeassistant>=2026.10.0,<2027.0",
+  "pytest>=8.4",
+  "pytest-asyncio>=1.1",
+  "ruff>=0.14"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["custom_components*"]
+namespaces = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]

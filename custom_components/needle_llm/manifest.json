@@ -1,0 +1,18 @@
+{
+  "domain": "needle_llm",
+  "name": "Needle LLM",
+  "codeowners": [
+    "@BelphegorPrime"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "intent",
+    "llm"
+  ],
+  "documentation": "https://github.com/BelphegorPrime/ha-needle-llm",
+  "integration_type": "service",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/BelphegorPrime/ha-needle-llm/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

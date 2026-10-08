@@ -1,0 +1,31 @@
+{
+  "title": "Needle LLM",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit Needle verbinden",
+        "description": "Verbinde Home Assistant mit einem lokalen Needle-Server. Der Server muss /model, /reset und /complete bereitstellen.",
+        "data": {
+          "url": "Needle-URL",
+          "min_confidence": "Minimale Confidence",
+          "reset_before_call": "Needle vor jeder Anfrage zurücksetzen",
+          "timeout": "Request-Timeout (Sekunden)"
+        },
+        "data_description": {
+          "url": "Zum Beispiel http://192.168.1.50:7860",
+          "min_confidence": "Aufrufe unterhalb dieses Werts werden abgelehnt.",
+          "reset_before_call": "Empfohlen. Needle bleibt zustandslos und Home Assistant verwaltet den Gesprächskontext.",
+          "timeout": "Maximale Dauer einer Needle-HTTP-Anfrage."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zu Needle nicht möglich.",
+      "invalid_response": "Needle hat eine ungültige /model-Antwort geliefert.",
+      "invalid_url": "Bitte eine http://- oder https://-URL eingeben."
+    },
+    "abort": {
+      "already_configured": "Dieser Needle-Server ist bereits konfiguriert."
+    }
+  }
+}
