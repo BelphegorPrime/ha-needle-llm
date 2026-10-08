@@ -37,7 +37,7 @@ authorization and execution boundary.
   schema before execution
 - Preserves Home Assistant's own exposure rules, intent/tool validation and
   conversation context
-- Resets Needle before every request by default, keeping routing stateless
+- Keeps routing stateless without a separate `/reset` request; Needle `/complete` already resets or rebuilds the routing agent
 - Rejects low-confidence, suppressed-only, multi-call, ungrounded and
   unavailable-tool responses
 
@@ -116,7 +116,6 @@ The config flow asks for:
 | --- | --- | --- |
 | Needle URL | - | Base URL of the Needle server, for example `http://192.168.1.50:7860` |
 | Minimum confidence | `0.80` | Minimum Needle confidence required before a routed call can execute |
-| Reset before each request | enabled | Calls `POST /reset` before `POST /complete` |
 | Request timeout | `30 s` | Timeout for one Needle HTTP request |
 
 Home Assistant Core runs in a separate container from add-ons, so do not use
@@ -222,18 +221,18 @@ debug log rather than weakening validation.
 
 ## Stateless routing
 
-Needle's `/complete` endpoint can keep conversation state. By default this
-integration resets Needle immediately before each routing request.
+The Needle playground server already makes `/complete` effectively stateless
+for this use case. If the tool schema is unchanged, it resets the current agent
+before completion; if the schema changes, it creates a fresh agent.
 
-This is intentional:
+Needle LLM therefore does not issue a separate `POST /reset` before each
+request. The HTTP client still serializes `/complete` calls with a lock so
+concurrent requests cannot interleave Needle state.
 
 ```text
 Home Assistant / conversation model = conversation history
-Needle                           = one-turn tool router
+Needle                              = one-turn tool router
 ```
-
-The HTTP client serializes the reset + complete pair with a lock so two Home
-Assistant requests cannot interleave Needle state.
 
 ## Development
 
@@ -270,7 +269,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.1.0
+0.1.1
 ```
 
 ## License
