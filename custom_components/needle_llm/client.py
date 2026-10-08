@@ -31,20 +31,31 @@ class NeedleClient:
         """Return model information from Needle."""
         return await self._async_json_request("GET", "/model")
 
+    async def async_reset(self) -> None:
+        """Reset Needle conversation state."""
+        try:
+            async with self._session.post(
+                f"{self._base_url}/reset",
+                timeout=self._timeout,
+            ) as response:
+                response.raise_for_status()
+                await response.read()
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise NeedleClientError(f"Needle reset failed: {err}") from err
+
     async def async_complete(
         self,
         *,
         tools: list[dict[str, Any]],
         query: str,
     ) -> dict[str, Any]:
-        """Route one stateless request through Needle.
+        """Route one explicitly stateless request through Needle.
 
-        Needle's playground server already starts every /complete request from a
-        fresh turn: it resets the current agent when the tool schema is unchanged
-        and creates a fresh agent when it changes. Serializing calls prevents
-        concurrent requests from sharing mutable server state.
+        The reset and complete requests share one lock so concurrent Home
+        Assistant requests cannot interleave Needle state.
         """
         async with self._route_lock:
+            await self.async_reset()
             return await self._async_json_request(
                 "POST",
                 "/complete",

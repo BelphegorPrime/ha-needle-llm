@@ -49,7 +49,7 @@ For an alternative without an LLM conversation agent, see the
   schema before execution
 - Preserves Home Assistant's own exposure rules, intent/tool validation and
   conversation context
-- Keeps routing stateless without a separate `/reset` request; Needle `/complete` already resets or rebuilds the routing agent
+- Explicitly resets Needle before every routed request so no prior Needle conversation state can influence tool selection
 - Rejects low-confidence, suppressed-only, multi-call, ungrounded and
   unavailable-tool responses
 
@@ -239,13 +239,14 @@ debug log rather than weakening validation.
 
 ## Stateless routing
 
-The Needle playground server already makes `/complete` effectively stateless
-for this use case. If the tool schema is unchanged, it resets the current agent
-before completion; if the schema changes, it creates a fresh agent.
+Needle LLM explicitly calls `POST /reset` before every `POST /complete`.
+Although the Needle playground also resets/rebuilds its agent while handling
+`/complete`, the explicit reset makes the integration's stateless-routing
+contract unambiguous and prevents prior Needle conversation state from
+influencing a new Home Assistant request.
 
-Needle LLM therefore does not issue a separate `POST /reset` before each
-request. The HTTP client still serializes `/complete` calls with a lock so
-concurrent requests cannot interleave Needle state.
+The client holds one lock across reset + complete so concurrent Home Assistant
+requests cannot interleave Needle state.
 
 ```text
 Home Assistant / conversation model = conversation history
@@ -287,7 +288,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.1.2
+0.1.4
 ```
 
 ## License

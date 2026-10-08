@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4 - 2026-10-08
+
+- Restore an explicit `POST /reset` before every `/complete` request.
+- Keep reset + complete inside the same client lock so concurrent Home Assistant
+  requests cannot interleave Needle state.
+- Treat a reset failure as a routing failure instead of continuing with possibly
+  stale Needle conversation state.
+
+
 ## 0.1.3 - 2026-10-08
 
 - Include Needle candidate calls, suppressed calls, reasoning, validation data,
