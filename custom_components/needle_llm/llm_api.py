@@ -19,6 +19,11 @@ from .compat import (
     schema_to_json_schema,
 )
 from .const import DOMAIN
+from .routing import (
+    build_discovery_tools,
+    candidate_tool_names,
+    execution_tool,
+)
 from .validation import RouteRejected, approve_route
 
 _LOGGER = logging.getLogger(__name__)
@@ -87,6 +92,7 @@ class NeedleRouteTool(llm.Tool):
             needle_tools.append(
                 {
                     "name": tool.name,
+                    "title": getattr(tool, "title", None),
                     "description": (
                         tool.description
                         or f"Execute Home Assistant tool {tool.name}"
@@ -99,6 +105,9 @@ class NeedleRouteTool(llm.Tool):
             return _error("Home Assistant exposed no compatible Assist tools")
 
         allowed_tools = {tool["name"] for tool in needle_tools}
+        tools_by_serialized_name = {
+            tool["name"]: tool for tool in needle_tools
+        }
 
         diagnostics = {
             "available_tool_count": len(needle_tools),
@@ -106,10 +115,15 @@ class NeedleRouteTool(llm.Tool):
             "skipped_tools": skipped_tools,
         }
 
+        discovery_tools = build_discovery_tools(needle_tools)
+
         try:
-            result, transport = await self._client.async_complete(
-                tools=needle_tools,
-                query=query,
+            discovery_result, discovery_transport = (
+                await self._client.async_complete(
+                    tools=discovery_tools,
+                    query=query,
+                    stage="discovery",
+                )
             )
         except NeedleClientError as err:
             return _error(
@@ -117,18 +131,62 @@ class NeedleRouteTool(llm.Tool):
                 stage=err.stage,
                 diagnostics={
                     **diagnostics,
-                    "transport": err.as_dict(),
+                    "discovery_transport": err.as_dict(),
                 },
             )
 
-        diagnostics["transport"] = transport
-        diagnostics["needle"] = _needle_diagnostics(result)
+        candidates = candidate_tool_names(
+            discovery_result,
+            allowed_tools,
+            limit=3,
+        )
+        diagnostics["discovery"] = {
+            "candidate_tools": candidates,
+            "candidate_tool_count": len(candidates),
+            "transport": discovery_transport,
+            "needle": _needle_diagnostics(discovery_result),
+        }
+
+        if not candidates:
+            return _error(
+                "Needle discovery did not identify a candidate Home Assistant tool",
+                stage="discovery_validation",
+                diagnostics=diagnostics,
+            )
+
+        narrowed_tools = [
+            execution_tool(tools_by_serialized_name[name])
+            for name in candidates
+        ]
+
+        try:
+            result, transport = await self._client.async_complete(
+                tools=narrowed_tools,
+                query=query,
+                stage="route",
+            )
+        except NeedleClientError as err:
+            return _error(
+                str(err),
+                stage=err.stage,
+                diagnostics={
+                    **diagnostics,
+                    "route_transport": err.as_dict(),
+                },
+            )
+
+        diagnostics["route"] = {
+            "candidate_tools": candidates,
+            "candidate_tool_count": len(candidates),
+            "transport": transport,
+            "needle": _needle_diagnostics(result),
+        }
 
         try:
             route = approve_route(
                 result,
                 self._minimum_confidence,
-                allowed_tools=allowed_tools,
+                allowed_tools=set(candidates),
             )
         except RouteRejected as err:
             return make_tool_result(
@@ -205,6 +263,8 @@ class NeedleRouteTool(llm.Tool):
                 "diagnostics": {
                     **diagnostics,
                     "stage": "completed",
+                    "narrowed_from": len(needle_tools),
+                    "narrowed_to": len(candidates),
                     "selected_tool": route.tool,
                     "selected_arguments": route.arguments,
                 },

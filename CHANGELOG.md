@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0 - 2026-10-08
+
+- Add dynamic two-stage Needle tool narrowing.
+- First send all current Home Assistant Assist tools with lightweight empty
+  parameter schemas so Needle only chooses relevant capabilities.
+- Use executable and suppressed discovery candidates only as non-executable
+  shortlist hints.
+- Send at most three shortlisted tools with their full native schemas in a
+  second Needle pass.
+- Keep the existing confidence, grounding, schema and native Home Assistant
+  validation gates exclusively on the second pass.
+- Add separate discovery and routing diagnostics and timings.
+
+
 ## 0.1.7 - 2026-10-08
 
 - Fix Ruff ASYNC109 in the editable configuration flow.

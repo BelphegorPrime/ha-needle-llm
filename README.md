@@ -8,7 +8,9 @@ general conversation model and Home Assistant's native Assist LLM tools.
 Assist
   -> conversation model (for example Qwen via llama.cpp)
   -> NeedleRoute
-  -> Needle /complete
+  -> Needle lightweight discovery
+  -> dynamically narrowed native Assist tool set
+  -> Needle full-schema routing
   -> validation / confidence gate
   -> native Home Assistant Assist tool
 ```
@@ -41,6 +43,8 @@ For an alternative without an LLM conversation agent, see the
 - Exposes one `NeedleRoute(query)` tool to the conversation model
 - Dynamically mirrors the tools provided by Home Assistant's native **Assist**
   LLM API
+- Uses two-stage routing: lightweight semantic discovery first, then full-schema
+  routing against only the dynamically shortlisted tools
 - Automatically follows the capabilities of the installed Home Assistant
   version instead of maintaining a hard-coded list of domains or intents
 - Routes device control, live-state queries, scripts, timers, climate, lights,
@@ -221,12 +225,27 @@ Earlier prototypes hard-coded `HassTurnOn`, `HassTurnOff`, `light` and
 `switch`. The integration no longer does that.
 
 For every `NeedleRoute` invocation it obtains the current native Assist API
-instance from Home Assistant, serializes the tool schemas that Home Assistant
-provides for that request/context, and sends those schemas to Needle.
+instance from Home Assistant and serializes the tools Home Assistant provides
+for that request/context.
+
+It then uses two Needle passes:
+
+1. **Discovery:** all current tools are sent with their native names, titles and
+   descriptions, but with empty parameter schemas. This keeps the prompt small
+   and asks Needle only which capability is relevant.
+2. **Routing:** only the discovered candidates (up to three) are sent again with
+   their complete native Home Assistant schemas. Only this second result is
+   eligible for execution.
+
+A low-confidence or suppressed discovery candidate is safe to use as a
+shortlist hint because discovery never executes anything. The second pass still
+has to satisfy the configured confidence threshold, grounding checks, native
+schema validation and Home Assistant's own authorization/execution rules.
 
 This has several advantages:
 
 - no duplicated Home Assistant capability list;
+- large unrelated schemas no longer compete with the relevant tool schema;
 - new native Assist tools can work without adding domain-specific dispatcher
   code here;
 - exposure and validation remain in Home Assistant;
@@ -243,11 +262,11 @@ Home Assistant's **Show details** output includes structured diagnostics for
 both successful and rejected routes. Depending on the failure stage this can
 include:
 
-- reset and `/complete` timings;
+- separate discovery and final-routing reset/`/complete` timings;
 - transport exception type and HTTP status;
 - Needle confidence, reasoning, validation and suppressed calls;
 - Needle prefill/decode throughput and peak RAM;
-- number of native Assist tools made available to Needle;
+- number of native Assist tools discovered and the final candidate shortlist;
 - tools skipped because their schema could not be serialized;
 - selected native Home Assistant tool and arguments;
 - the stage at which execution stopped.
@@ -306,7 +325,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.1.7
+0.2.0
 ```
 
 ## License

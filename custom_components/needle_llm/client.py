@@ -72,12 +72,12 @@ class NeedleClient:
             stage="model",
         )
 
-    async def async_reset(self) -> dict[str, Any]:
+    async def async_reset(self, *, stage: str = "reset") -> dict[str, Any]:
         """Reset Needle conversation state."""
         return await self._async_json_request(
             "POST",
             "/reset",
-            stage="reset",
+            stage=stage,
         )
 
     async def async_complete(
@@ -85,18 +85,19 @@ class NeedleClient:
         *,
         tools: list[dict[str, Any]],
         query: str,
+        stage: str = "route",
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Route one explicitly stateless request through Needle."""
         async with self._route_lock:
             reset_started = time.monotonic()
-            reset_result = await self.async_reset()
+            reset_result = await self.async_reset(stage=f"{stage}_reset")
             reset_ms = (time.monotonic() - reset_started) * 1000
 
             complete_started = time.monotonic()
             result = await self._async_json_request(
                 "POST",
                 "/complete",
-                stage="complete",
+                stage=f"{stage}_complete",
                 json={"tools": tools, "query": query},
             )
             complete_ms = (time.monotonic() - complete_started) * 1000
