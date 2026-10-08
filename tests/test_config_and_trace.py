@@ -12,12 +12,12 @@ from custom_components.needle_llm.const import (
     BACKEND_HA_PROVIDER,
     BACKEND_NEEDLE,
     CONF_BACKEND,
-    SUPPORTED_BACKENDS,
-    UNSUPPORTED_LEGACY_BACKENDS,
     CONF_MIN_CONFIDENCE,
     CONF_PROVIDER_MODEL,
     CONF_ROUTING_STRATEGY,
     CONF_TIMEOUT,
+    SUPPORTED_BACKENDS,
+    UNSUPPORTED_LEGACY_BACKENDS,
 )
 from custom_components.needle_llm.trace import build_routing_trace
 

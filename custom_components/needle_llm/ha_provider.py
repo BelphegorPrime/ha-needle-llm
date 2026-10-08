@@ -15,6 +15,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 
+
 def openai_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Convert native Assist tools to OpenAI-format model proposals.
 
