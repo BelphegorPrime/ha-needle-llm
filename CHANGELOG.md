@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 - 2026-10-08
+
+- Fix Ruff/isort spacing in the dynamic narrowing test module.
+
+
 ## 0.2.1 - 2026-10-08
 
 - Fix Ruff import ordering in the dynamic narrowing tests so the complete CI
