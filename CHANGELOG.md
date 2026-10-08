@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.7 - 2026-10-08
+
+- Fix Ruff ASYNC109 in the editable configuration flow.
+- Confirm HACS, hassfest and test matrix pass on Home Assistant 2024.7.4,
+  2025.6.3 and 2026.10.0.
+
+
 ## 0.1.5 - 2026-10-08
 
 - Greatly expand Home Assistant "Show details" diagnostics.
