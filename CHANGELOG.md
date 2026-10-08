@@ -8,8 +8,14 @@ Initial release.
 - Validate the server through `GET /model`.
 - Register a selectable Home Assistant LLM API.
 - Add the `NeedleRoute` LLM tool.
-- Route `HassTurnOn` and `HassTurnOff` through Needle.
-- Limit v0.1 routing to Assist-exposed light and switch entities.
-- Add confidence, grounding, ambiguity and exposure validation.
+- Dynamically mirror the native Home Assistant Assist LLM tool set rather than
+  hard-coding intents or entity domains.
+- Validate Needle-selected arguments using the original Home Assistant tool
+  schema before dispatch.
+- Delegate execution back to Home Assistant's native Assist API so exposure,
+  intent/tool validation and context remain authoritative.
+- Add compatibility handling for Home Assistant 2024.7 through current
+  releases.
+- Add confidence and grounding validation.
 - Keep Needle stateless by resetting it before requests by default.
-- Add HACS metadata, tests and CI.
+- Add HACS metadata, brand asset, tests and CI.

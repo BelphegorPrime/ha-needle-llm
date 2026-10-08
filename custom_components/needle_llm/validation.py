@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Any
-
-from .const import SUPPORTED_NEEDLE_TOOLS
 
 
 class RouteRejected(Exception):
@@ -14,7 +13,7 @@ class RouteRejected(Exception):
 
 @dataclass(frozen=True, slots=True)
 class ApprovedRoute:
-    """A Needle route that passed the first validation boundary."""
+    """A Needle route that passed validation."""
 
     tool: str
     arguments: dict[str, Any]
@@ -24,8 +23,10 @@ class ApprovedRoute:
 def approve_route(
     result: dict[str, Any],
     minimum_confidence: float,
+    *,
+    allowed_tools: Collection[str],
 ) -> ApprovedRoute:
-    """Validate Needle output before Home Assistant target validation."""
+    """Validate Needle output before forwarding it to Home Assistant."""
     if result.get("success") is not True:
         raise RouteRejected("Needle did not return success=true")
 
@@ -53,8 +54,8 @@ def approve_route(
         raise RouteRejected("Needle returned an invalid function call")
 
     tool = call.get("name")
-    if tool not in SUPPORTED_NEEDLE_TOOLS:
-        raise RouteRejected(f"Unsupported Needle tool: {tool}")
+    if not isinstance(tool, str) or tool not in allowed_tools:
+        raise RouteRejected(f"Needle selected an unavailable tool: {tool}")
 
     arguments = call.get("arguments")
     if not isinstance(arguments, dict):

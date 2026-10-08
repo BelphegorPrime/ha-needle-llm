@@ -9,6 +9,3 @@ CONF_TIMEOUT = "timeout"
 DEFAULT_MIN_CONFIDENCE = 0.80
 DEFAULT_RESET_BEFORE_CALL = True
 DEFAULT_TIMEOUT = 30
-
-SUPPORTED_DOMAINS = frozenset({"light", "switch"})
-SUPPORTED_NEEDLE_TOOLS = frozenset({"HassTurnOn", "HassTurnOff"})

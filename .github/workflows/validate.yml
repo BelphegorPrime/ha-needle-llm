@@ -11,7 +11,19 @@ permissions:
 
 jobs:
   tests:
+    name: tests (HA ${{ matrix.homeassistant }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - homeassistant: "2024.7.4"
+            python: "3.12"
+          - homeassistant: "2025.6.3"
+            python: "3.13"
+          - homeassistant: "2026.10.0"
+            python: "3.14"
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -19,11 +31,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python }}
           cache: pip
 
       - name: Install test dependencies
-        run: python -m pip install -e '.[test]'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[test]'
+          python -m pip install "homeassistant==${{ matrix.homeassistant }}"
 
       - name: Ruff
         run: ruff check .

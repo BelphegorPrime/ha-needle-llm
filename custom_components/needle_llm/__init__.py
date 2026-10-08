@@ -5,10 +5,10 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_URL
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import llm
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import NeedleClient
+from .compat import register_api_compat
 from .const import (
     CONF_MIN_CONFIDENCE,
     CONF_RESET_BEFORE_CALL,
@@ -49,7 +49,7 @@ async def async_setup_entry(
         ),
     )
 
-    unregister = llm.async_register_api(hass, api)
+    unregister = register_api_compat(hass, api)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "client": client,

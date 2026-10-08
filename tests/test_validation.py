@@ -7,6 +7,8 @@ from custom_components.needle_llm.validation import (
     approve_route,
 )
 
+ALLOWED = {"HassTurnOn", "HassTurnOff", "GetLiveContext"}
+
 
 def _result(
     *,
@@ -31,8 +33,8 @@ def _result(
 
 
 def test_approve_route() -> None:
-    """A single confident grounded allowlisted call is approved."""
-    route = approve_route(_result(), 0.80)
+    """A single confident grounded available call is approved."""
+    route = approve_route(_result(), 0.80, allowed_tools=ALLOWED)
 
     assert route.tool == "HassTurnOff"
     assert route.arguments == {"name": "Wohnzimmerlampe"}
@@ -50,34 +52,38 @@ def test_suppressed_only_is_rejected() -> None:
     ]
 
     with pytest.raises(RouteRejected, match="exactly one executable call"):
-        approve_route(result, 0.80)
+        approve_route(result, 0.80, allowed_tools=ALLOWED)
 
 
 def test_low_confidence_is_rejected() -> None:
     """Low-confidence calls are rejected."""
     with pytest.raises(RouteRejected, match="below"):
-        approve_route(_result(confidence=0.79), 0.80)
+        approve_route(_result(confidence=0.79), 0.80, allowed_tools=ALLOWED)
 
 
 def test_ungrounded_is_rejected() -> None:
     """Needle grounding failures are rejected."""
     with pytest.raises(RouteRejected, match="ungrounded"):
-        approve_route(_result(ungrounded=["HassTurnOn.name"]), 0.80)
+        approve_route(
+            _result(ungrounded=["HassTurnOn.name"]),
+            0.80,
+            allowed_tools=ALLOWED,
+        )
 
 
 def test_multiple_calls_are_rejected() -> None:
-    """Version 0.1.0 executes no multi-call response."""
+    """One NeedleRoute invocation executes at most one native HA tool."""
     calls = [
         {"name": "HassTurnOn", "arguments": {"name": "A"}},
         {"name": "HassTurnOn", "arguments": {"name": "B"}},
     ]
 
     with pytest.raises(RouteRejected, match="exactly one executable call"):
-        approve_route(_result(function_calls=calls), 0.80)
+        approve_route(_result(function_calls=calls), 0.80, allowed_tools=ALLOWED)
 
 
-def test_unknown_tool_is_rejected() -> None:
-    """Tools outside the v0.1.0 allowlist are rejected."""
+def test_tool_not_in_current_assist_api_is_rejected() -> None:
+    """Needle cannot execute tools absent from the current Assist API instance."""
     calls = [
         {
             "name": "CallService",
@@ -85,8 +91,8 @@ def test_unknown_tool_is_rejected() -> None:
         }
     ]
 
-    with pytest.raises(RouteRejected, match="Unsupported Needle tool"):
-        approve_route(_result(function_calls=calls), 0.80)
+    with pytest.raises(RouteRejected, match="unavailable tool"):
+        approve_route(_result(function_calls=calls), 0.80, allowed_tools=ALLOWED)
 
 
 def test_failed_result_is_rejected() -> None:
@@ -95,4 +101,4 @@ def test_failed_result_is_rejected() -> None:
     result["success"] = False
 
     with pytest.raises(RouteRejected, match="success=true"):
-        approve_route(result, 0.80)
+        approve_route(result, 0.80, allowed_tools=ALLOWED)
