@@ -196,3 +196,21 @@ def test_provider_rejects_missing_entry_before_accessing_runtime() -> None:
     hass.config_entries.async_get_entry.return_value = None
     with pytest.raises(ProviderError, match="unavailable"):
         resolve_provider(hass, "abc:def")
+
+
+
+def test_provider_api_id_does_not_conflict_with_needle_api_id() -> None:
+    """Two router entries may refer to the same local Needle server."""
+    from custom_components.needle_llm.llm_api import (
+        api_id_for_router,
+        api_id_for_url,
+    )
+
+    url = "http://needle:7860"
+    assert api_id_for_router(url, "needle", "needle-entry") == api_id_for_url(
+        url
+    )
+    first = api_id_for_router(url, "ha_provider", "provider-entry-1")
+    second = api_id_for_router(url, "ha_provider", "provider-entry-2")
+    assert first != second
+    assert first != api_id_for_url(url)

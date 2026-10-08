@@ -639,6 +639,15 @@ def api_id_for_url(base_url: str) -> str:
     return f"{DOMAIN}_{digest}"
 
 
+def api_id_for_router(
+    base_url: str, backend: str, entry_id: str
+) -> str:
+    """Keep existing API IDs, separate provider entries sharing Needle URL."""
+    if backend == BACKEND_HA_PROVIDER:
+        return api_id_for_url(f"ha_provider:{entry_id}")
+    return api_id_for_url(base_url)
+
+
 def api_name_for_url(
     base_url: str, *, backend: str = DEFAULT_BACKEND
 ) -> str:

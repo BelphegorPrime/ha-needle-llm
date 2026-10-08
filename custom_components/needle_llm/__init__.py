@@ -24,7 +24,7 @@ from .const import (
     normalize_backend,
 )
 from .ha_pipeline import DEFAULT_STRATEGY
-from .llm_api import NeedleAPI, api_id_for_url, api_name_for_url
+from .llm_api import NeedleAPI, api_id_for_router, api_name_for_url
 from .openai_client import OpenAICompatibleClient
 
 
@@ -68,7 +68,7 @@ async def async_setup_entry(
 
     api = NeedleAPI(
         hass,
-        api_id=api_id_for_url(identity_url),
+        api_id=api_id_for_router(identity_url, backend, entry.entry_id),
         name=api_name_for_url(base_url, backend=backend),
         client=client,
         backend=backend,

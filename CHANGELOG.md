@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1 - 2026-10-08
+
+- Assign each HA provider-backed routing entry its own stable LLM API ID,
+  even when it shares a Needle URL with an existing Needle-only integration.
+- Preserve existing Needle-only API IDs and conversation API selections.
+- Add regression coverage for the provider/Needle ID collision.
+
+
 ## 0.4.0 - 2026-10-08
 
 - Add a provider-backed routing mode referencing an existing Home Assistant
