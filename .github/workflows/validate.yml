@@ -42,8 +42,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e '.[test]'
           python -m pip install "homeassistant==${{ matrix.homeassistant }}"
-          if [ -n "${{ matrix.compat_packages }}" ]; then
-            python -m pip install "${{ matrix.compat_packages }}"
+          COMPAT_PACKAGES='${{ matrix.compat_packages }}'
+          if [ -n "$COMPAT_PACKAGES" ]; then
+            read -r -a packages <<< "$COMPAT_PACKAGES"
+            python -m pip install "${packages[@]}"
           fi
 
       - name: Ruff
