@@ -241,10 +241,10 @@ It then uses two Needle passes:
    distinguish direct actions from device-specific settings without hard-coded
    tool mappings.
 2. **Routing:** only the discovered candidates (up to three) are sent again with
-   their complete native Home Assistant schemas. Both stages receive generic
-   operation-first guidance: prefer the explicitly requested action and never
-   invent optional settings such as color, brightness or volume. Only this
-   second result is eligible for execution.
+   their complete native Home Assistant schemas and original descriptions.
+   Critically, this pass receives the **unaltered original user request**, not
+   the discovery instructions. This avoids confusing tool argument extraction
+   with meta-instructions. Only this second result is eligible for execution.
 
 A low-confidence or suppressed discovery candidate is safe to use as a
 shortlist hint because discovery never executes anything. The second pass still
@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.2.4
+0.2.5
 ```
 
 ## License

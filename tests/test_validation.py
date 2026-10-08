@@ -216,3 +216,19 @@ def test_routing_query_is_operation_first() -> None:
     assert "action the user explicitly requested" in query
     assert "Do not invent optional settings" in query
     assert query.endswith("User request: Schalte die Wohnzimmerlampe aus")
+
+
+def test_execution_tool_does_not_append_discovery_instructions() -> None:
+    """Stage two must not inject instructions that look like arguments."""
+    tool = {
+        "name": "light__HassLightSet",
+        "title": "Set light",
+        "description": "Sets color or brightness.",
+        "parameters": {
+            "type": "object",
+            "properties": {"color": {"type": "string"}},
+        },
+    }
+    result = execution_tool(tool)
+    assert result["description"] == "Sets color or brightness."
+    assert result["parameters"] is tool["parameters"]

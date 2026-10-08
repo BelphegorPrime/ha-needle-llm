@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.5 - 2026-10-08
+
+- Keep operation-first guidance only in the discovery pass.
+- Send the original user utterance verbatim to final Needle argument extraction.
+- Restore unmodified native tool descriptions during final routing.
+- Show explicitly when no Home Assistant lookup or action was attempted, so the
+  outer conversation model does not invent a device-not-found explanation.
+
+
 ## 0.2.4 - 2026-10-08
 
 - Make dynamic discovery operation-first instead of device-type-first.

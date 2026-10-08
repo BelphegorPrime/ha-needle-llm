@@ -119,7 +119,7 @@ class NeedleRouteTool(llm.Tool):
         discovery_tools = build_discovery_tools(needle_tools)
         routed_query = build_routing_query(query)
 
-        diagnostics["routing_strategy"] = "two_stage_operation_first_v2"
+        diagnostics["routing_strategy"] = "two_stage_raw_arguments_v3"
 
         try:
             discovery_result, discovery_transport = (
@@ -164,9 +164,13 @@ class NeedleRouteTool(llm.Tool):
         ]
 
         try:
+            # Discovery needs action-selection guidance. Once the native
+            # Assist tools have been narrowed, give Needle only the user's
+            # original request to extract target and explicitly stated values.
+            # Extra instructions can be mistaken for tool arguments.
             result, transport = await self._client.async_complete(
                 tools=narrowed_tools,
-                query=routed_query,
+                query=query,
                 stage="route",
             )
         except NeedleClientError as err:
@@ -180,6 +184,7 @@ class NeedleRouteTool(llm.Tool):
             )
 
         diagnostics["route"] = {
+            "query_mode": "original_user_request",
             "candidate_tools": candidates,
             "candidate_tool_count": len(candidates),
             "transport": transport,
@@ -199,6 +204,12 @@ class NeedleRouteTool(llm.Tool):
                     "reason": str(err),
                     "confidence": result.get("confidence"),
                     "stage": "validation",
+                    "device_lookup_attempted": False,
+                    "guidance": (
+                        "Needle did not produce an approved tool call. "
+                        "No Home Assistant action or device lookup ran. "
+                        "Do not conclude that the device is missing."
+                    ),
                     "diagnostics": diagnostics,
                 },
                 error=True,
@@ -315,7 +326,10 @@ class NeedleAPI(llm.API):
                 "home data or an action, call NeedleRoute. Pass the user's "
                 "original request unchanged. NeedleRoute delegates only to "
                 "tools provided by Home Assistant's native Assist API. Never "
-                "claim success unless the result contains executed=true."
+                "claim success unless the result contains executed=true. "
+                "If executed=false and no native Home Assistant tool ran, "
+                "say that routing failed; do not invent missing devices, "
+                "unavailable entities or failed entity lookups."
             ),
             llm_context=llm_context,
             tools=[

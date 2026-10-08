@@ -106,20 +106,13 @@ def build_routing_query(query: str) -> str:
 def execution_tool(
     tool: dict[str, Any],
 ) -> dict[str, Any]:
-    """Strip integration-only metadata before sending a real tool to Needle."""
-    description = tool["description"]
-    action_parameters = _action_parameter_names(tool)
+    """Restore the unmodified native tool description and parameter schema.
 
-    if action_parameters:
-        fields = ", ".join(action_parameters)
-        description = (
-            f"{description} Only set action-specific inputs ({fields}) when "
-            "they are explicitly grounded in the user's request."
-        )
-
+    Discovery-only guidance must never pollute the parameter-extraction pass.
+    """
     return {
         "name": tool["name"],
-        "description": description,
+        "description": tool["description"],
         "parameters": tool["parameters"],
     }
 
