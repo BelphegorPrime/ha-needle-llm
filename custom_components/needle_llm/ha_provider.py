@@ -15,7 +15,24 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 
-from .openai_client import openai_tools
+def openai_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert native Assist tools to OpenAI-format model proposals.
+
+    This is used only by an existing HA model before Needle approval, never
+    as a standalone model-only execution backend.
+    """
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": tool["name"],
+                "description": tool["description"],
+                "parameters": tool["parameters"],
+            },
+        }
+        for tool in tools
+    ]
+
 
 PROVIDER_DOMAIN = "llama_cpp"
 _MODEL_KEY = "chat_model"

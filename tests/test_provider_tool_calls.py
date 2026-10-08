@@ -1,10 +1,10 @@
-"""Unit tests for the OpenAI-compatible routing backend."""
+"""Tool-call serialization tests for the HA model proposal adapter."""
 
 import json
 
 import pytest
 
-from custom_components.needle_llm.openai_client import openai_tools
+from custom_components.needle_llm.ha_provider import openai_tools
 from custom_components.needle_llm.validation import (
     RouteRejected,
     approve_openai_route,

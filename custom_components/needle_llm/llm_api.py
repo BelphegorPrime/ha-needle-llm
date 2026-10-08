@@ -25,7 +25,6 @@ from .compat import (
 from .const import (
     BACKEND_HA_PROVIDER,
     BACKEND_NEEDLE,
-    BACKEND_OPENAI_COMPATIBLE,
     DEFAULT_BACKEND,
     DOMAIN,
 )
@@ -35,7 +34,6 @@ from .ha_pipeline import (
     async_provider_route,
 )
 from .ha_provider import HomeAssistantModelProvider
-from .openai_client import OpenAICompatibleClient, OpenAICompatibleClientError
 from .routing import (
     build_discovery_tools,
     build_routing_query,
@@ -50,7 +48,6 @@ from .target_guard import (
 from .trace import build_routing_trace
 from .validation import (
     RouteRejected,
-    approve_openai_route,
     approve_route,
 )
 
@@ -73,7 +70,7 @@ class NeedleRouteTool(llm.Tool):
 
     def __init__(
         self,
-        client: NeedleClient | OpenAICompatibleClient,
+        client: NeedleClient,
         *,
         backend: str,
         minimum_confidence: float,
@@ -147,11 +144,7 @@ class NeedleRouteTool(llm.Tool):
         diagnostics = {
             "backend": self._backend,
             "request_language": llm_context.language,
-            "minimum_confidence": (
-                self._minimum_confidence
-                if self._backend != BACKEND_OPENAI_COMPATIBLE
-                else None
-            ),
+            "minimum_confidence": self._minimum_confidence,
             "available_tool_count": len(needle_tools),
             "skipped_tool_count": len(skipped_tools),
             "skipped_tools": skipped_tools,
@@ -188,68 +181,6 @@ class NeedleRouteTool(llm.Tool):
             candidates = [proposal.candidate]
             matched_target = proposal.matched_target
             removed_fields = proposal.removed_fields
-        elif self._backend == BACKEND_OPENAI_COMPATIBLE:
-            diagnostics["routing_strategy"] = "openai_compatible_single_pass"
-            try:
-                result, transport = await self._client.async_complete(
-                    tools=needle_tools,
-                    query=query,
-                    language=llm_context.language,
-                )
-            except OpenAICompatibleClientError as err:
-                return _error(
-                    str(err),
-                    stage=err.stage,
-                    diagnostics={
-                        **diagnostics,
-                        "route_transport": err.as_dict(),
-                    },
-                )
-
-            choices = result.get("choices")
-            choice = choices[0] if isinstance(choices, list) and choices else {}
-            message = choice.get("message") if isinstance(choice, dict) else {}
-            calls = (
-                message.get("tool_calls", [])
-                if isinstance(message, dict) else []
-            )
-            diagnostics["route"] = {
-                "query_mode": "original_user_request",
-                "transport": transport,
-                "finish_reason": (
-                    choice.get("finish_reason")
-                    if isinstance(choice, dict) else None
-                ),
-                "tool_calls": calls,
-            }
-
-            try:
-                route = approve_openai_route(
-                    result,
-                    allowed_tools=allowed_tools,
-                )
-            except RouteRejected as err:
-                return make_tool_result(
-                    {
-                        "executed": False,
-                        "reason": str(err),
-                        "stage": "validation",
-                        "device_lookup_attempted": False,
-                        "guidance": (
-                            "The model did not produce an approved tool call. "
-                            "No Home Assistant action or device lookup ran."
-                        ),
-                        "routing_trace": build_routing_trace(
-                            diagnostics,
-                            status="rejected",
-                            stage="validation",
-                        ),
-                        "diagnostics": diagnostics,
-                    },
-                    error=True,
-                )
-            matched_target = None
-            removed_fields: list[dict[str, Any]] = []
         else:
             discovery_tools = build_discovery_tools(needle_tools)
             routed_query = build_routing_query(query)
@@ -564,7 +495,11 @@ class NeedleRouteTool(llm.Tool):
                 **(
                     {"needle_confidence": route.confidence}
                     if self._backend == BACKEND_NEEDLE
-                    else {"confidence_available": False}
+                    else {
+                        "needle_confidence": diagnostics.get(
+                            "needle_approval", {}
+                        ).get("confidence")
+                    }
                 ),
                 "arguments": arguments,
                 "home_assistant": native_data,
@@ -597,13 +532,6 @@ if hasattr(llm, "ToolAnnotations"):
     )
 
 
-class OpenAICompatibleRouteTool(NeedleRouteTool):
-    """Route native Assist tools through an OpenAI-compatible model API."""
-
-    name = "OpenAICompatibleRoute"
-    title = "Route Home Assistant request through an OpenAI-compatible model"
-
-
 class NeedleVerifiedRouteTool(NeedleRouteTool):
     """Route through an existing HA model with compulsory Needle approval."""
 
@@ -626,7 +554,7 @@ class NeedleAPI(llm.API):
         *,
         api_id: str,
         name: str,
-        client: NeedleClient | OpenAICompatibleClient,
+        client: NeedleClient,
         backend: str,
         minimum_confidence: float,
         provider_model: str = "",
@@ -652,8 +580,6 @@ class NeedleAPI(llm.API):
         """Return the API instance for one conversation request."""
         if self._backend == BACKEND_HA_PROVIDER:
             tool_cls = NeedleVerifiedRouteTool
-        elif self._backend == BACKEND_OPENAI_COMPATIBLE:
-            tool_cls = OpenAICompatibleRouteTool
         else:
             tool_cls = NeedleRouteTool
         tool_name = tool_cls.name
@@ -705,8 +631,6 @@ def api_name_for_url(
     location = parsed.netloc or base_url
     if backend == BACKEND_HA_PROVIDER:
         label = "Needle + HA model"
-    elif backend == BACKEND_OPENAI_COMPATIBLE:
-        label = "OpenAI-compatible"
     else:
         label = "Needle LLM"
     return f"{label} @ {location}"

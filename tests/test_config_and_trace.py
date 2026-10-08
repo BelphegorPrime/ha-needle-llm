@@ -11,10 +11,10 @@ from custom_components.needle_llm.config_flow import (
 from custom_components.needle_llm.const import (
     BACKEND_HA_PROVIDER,
     BACKEND_NEEDLE,
-    BACKEND_OPENAI_COMPATIBLE,
     CONF_BACKEND,
+    SUPPORTED_BACKENDS,
+    UNSUPPORTED_LEGACY_BACKENDS,
     CONF_MIN_CONFIDENCE,
-    CONF_MODEL,
     CONF_PROVIDER_MODEL,
     CONF_ROUTING_STRATEGY,
     CONF_TIMEOUT,
@@ -47,7 +47,7 @@ def test_ha_provider_only_shows_relevant_fields() -> None:
     assert CONF_ROUTING_STRATEGY in fields
     assert CONF_MIN_CONFIDENCE in fields
     assert CONF_TIMEOUT in fields
-    assert CONF_MODEL not in fields
+    assert "model" not in fields
     assert "url" in fields
     assert form(
         {
@@ -70,16 +70,34 @@ def test_needle_only_has_no_provider_model() -> None:
     assert fields == {"url", CONF_MIN_CONFIDENCE, CONF_TIMEOUT}
 
 
-def test_direct_openai_never_shows_needle_confidence() -> None:
-    """Do not imply direct model tool calls provide Needle confidence."""
-    fields = _fields(
+def test_only_needle_modes_are_selectable() -> None:
+    """No model-only mode may bypass Needle approval."""
+    from homeassistant.helpers.selector import SelectSelector
+
+    selector = next(iter(_mode_schema(BACKEND_NEEDLE).schema.values()))
+    assert isinstance(selector, SelectSelector)
+    values = {item["value"] for item in selector.config["options"]}
+    assert values == SUPPORTED_BACKENDS
+    assert "openai_compatible" not in values
+    assert "llama_cpp" not in values
+
+
+def test_old_direct_model_modes_are_marked_unsupported() -> None:
+    """Old model-only config must not silently become a Needle setup."""
+    assert UNSUPPORTED_LEGACY_BACKENDS == {
+        "openai_compatible",
+        "llama_cpp",
+    }
+
+
+def test_reject_unsupported_direct_mode_settings() -> None:
+    """Even programmatic use of the settings schema cannot enable it."""
+    import pytest
+
+    with pytest.raises(vol.Invalid, match="Needle is required"):
         _settings_schema(
-            backend=BACKEND_OPENAI_COMPATIBLE,
-            provider_choices={},
-            values={},
+            backend="openai_compatible", provider_choices={}, values={}
         )
-    )
-    assert fields == {"url", CONF_MODEL, CONF_TIMEOUT}
 
 
 def test_trace_exposes_actual_routing_stages_and_timings() -> None:

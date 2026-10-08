@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.4.2
+0.4.3
 ```
 
 ## License
@@ -352,60 +352,6 @@ named exposed entity are rejected before an action is dispatched.
 
 When no unique exposed entity name is present, the original full schema is
 used unchanged; low-confidence and suppressed Needle calls are never executed.
-
-
-## Optional llama.cpp GPU tool router (experimental)
-
-The integration supports two alternative tool-routing backends:
-**Needle** (existing default) and **OpenAI-compatible API**, using its OpenAI-compatible
-`/v1/chat/completions` function-calling API. All existing Needle configurations
-continue using Needle unless you explicitly change the backend.
-
-To test llama.cpp:
-
-1. Run `llama-server` with a GGUF model that reliably supports tool calls.
-   Enable GPU offloading and a Jinja tool-call-capable chat template
-   (on versions where `--jinja` is already the default, no extra flag is needed).
-2. In Home Assistant, open **Settings -> Devices & services -> Needle LLM ->
-   Configure** and choose backend `openai_compatible`. Set **Server URL** to the
-   hostname and port reachable *from Home Assistant Core*, for example
-   `http://192.168.1.50:50033` (not the `/v1/chat/completions` path).
-   Leave the optional **Model ID** empty to select the first `/v1/models` ID,
-   or explicitly enter the alias configured in llama-server.
-3. Save the configuration. In your conversation agent select the available
-   **OpenAICompatibleRoute** tool/API and test a simple, harmless command.
-
-The OpenAI-compatible backend performs **one** OpenAI tool-routing call with the
-currently available native HA Assist tools. It does not call Needle, does not
-require `/reset`, and does not send user requests to an external cloud.
-The model must return exactly one allowed tool call and valid JSON-object
-arguments. Existing native HA parameter validation, exposure controls and
-target guards continue to apply before execution.
-
-**Confidence:** the OpenAI-compatible server's OpenAI tool-call response does not provide a
-calibrated Needle confidence number. The configurable minimum-confidence
-threshold therefore applies only to Needle. No synthetic confidence of 1.0
-is assigned to llama.cpp results.
-
-Do not expose unauthenticated llama.cpp endpoints to the public Internet.
-This prototype expects a local/trusted network server without an API key.
-
-
-### Reuse of other Home Assistant LLM integrations
-
-This adapter talks to an OpenAI-compatible HTTP inference **endpoint**, not
-to a second Home Assistant Conversation agent. llama.cpp, vLLM, Ollama and
-other servers may implement this interface; API compatibility for tool calls
-must be verified per server/model. A Home Assistant conversation-agent
-integration does not expose a universal raw model-tool-call interface.
-Forwarding to its `conversation.process` workflow would usually execute tools
-inside that agent before this integration could apply its own safety checks,
-and may recurse if the agent references this same router.
-
-Existing `llama_cpp` backend settings from the first prototype are mapped
-to `openai_compatible` for backwards compatibility. This experimental adapter
-currently expects a trusted OpenAI-compatible endpoint not requiring bearer
-authentication.
 
 
 ## Existing Home Assistant model integration + Needle approval (v0.4.0)
@@ -454,10 +400,9 @@ unavailable target, ambiguous tool, mismatched action, missing tool call,
 untrusted model output or validation failure results in **no action**. No
 language-specific mappings or fixed smart-home domain lists are used.
 
-The existing standalone Needle and direct OpenAI-compatible HTTP backends
-remain available for compatibility. Do not confuse the standalone
-OpenAI-compatible backend with `ha_provider`: the former bypasses Needle,
-whereas the latter always requires its explicit approval.
+The supported configurations always include Needle: either standalone
+Needle routing or Needle plus an existing HA model provider. The old
+model-only backend was intentionally removed because it bypassed Needle.
 
 **Compatibility:** Selecting an arbitrary HA conversation agent cannot
 guarantee safe tool proposal interception. The initial adapter deliberately
@@ -473,15 +418,13 @@ tool calling. Benchmarking remains essential.
 
 ## Clearer setup and execution details (v0.4.2)
 
-The configuration wizard has **two steps**. First select the routing mode using
-readable labels. The second page displays **only settings relevant** to that
-mode:
+The configuration wizard has **two steps**. First select one of the two
+Needle-powered modes. The second page displays **only settings relevant** to it:
 
 | Mode | Settings shown |
 | --- | --- |
 | Needle + existing HA model | Existing HA model, preselection strategy, Needle URL, minimum Needle confidence, timeout |
 | Needle only | Needle URL, minimum Needle confidence, timeout |
-| Direct OpenAI-compatible | Model server URL, optional model ID, timeout |
 
 Provider-backed routing **never asks you to re-enter** your llama.cpp endpoint,
 API key or model ID. The provider picker reuses your configured HA model.
@@ -516,3 +459,36 @@ When the router actually receives a call, its tool result contains a
 The trace is diagnostic JSON, not a frontend-only visualization.
 No underlying model HTTP credentials are included. Device names and user
 commands may still appear in the local Assist trace, so review before sharing.
+
+
+## Needle-only routing modes (v0.4.3)
+
+**Standalone OpenAI-compatible model routing has been removed.** It bypassed
+Needle and duplicated the functionality of existing Home Assistant model
+integrations. Only these modes remain:
+
+- **Needle + existing Home Assistant model** (recommended): choose the loaded
+  HA conversation model and whether the model or Needle preselects a tool.
+  Needle must independently approve the action. The HA model then generates
+  the arguments for the approved tool only.
+- **Needle only:** Needle performs tool selection and argument generation;
+  native Home Assistant Assist validation still governs execution.
+
+Existing Needle-based configurations keep their saved settings. An old
+`openai_compatible` or `llama_cpp` router entry (from the experimental
+0.3.x releases) **will not run or silently fall back** to a different model:
+its setup explicitly fails until you reconfigure it to use a real Needle URL
+and one of the supported modes, or remove that obsolete entry.
+
+**Trace visibility:** A successful native `light__HassLightSet` action by
+itself does *not* establish that Needle was used. In your conversation agent,
+select the Needle-provided LLM API (for the provider-backed mode, look for
+**Needle + HA model** / **NeedleVerifiedRoute**) and do not grant the outer
+agent a competing direct native Assist tool API for a controlled comparison.
+The integration can provide detailed Needle timings and decisions only when
+its own tool was invoked.
+
+For a real `NeedleVerifiedRoute` invocation, the `routing_trace` field
+contains stage-by-stage tool proposals, Needle confidence/approval, model
+arguments, native HA target results, and durations; `diagnostics` retains
+the full raw details. Direct native HA calls are outside this routing trace.

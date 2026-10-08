@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Choose routing mode",
-        "description": "Choose how tools are selected. Recommended: Needle with a model already configured in Home Assistant. The next step shows only the relevant settings.",
+        "description": "Choose Needle alone or Needle with an existing Home Assistant model. Both modes always use Needle.",
         "data": {
           "backend": "Routing mode"
         },
@@ -20,22 +20,20 @@
           "routing_strategy": "Who should preselect the tools?",
           "url": "Server URL",
           "min_confidence": "Minimum Needle confidence",
-          "timeout": "Timeout per model request (seconds)",
-          "model": "Model ID (optional)"
+          "timeout": "Timeout per model request (seconds)"
         },
         "data_description": {
           "provider_model": "A configured llama.cpp model. Server URL, credentials and model ID are reused automatically from Home Assistant.",
           "routing_strategy": "Both options require independent Needle approval. The existing HA model generates the final tool arguments.",
-          "url": "Needle server address for Needle modes; otherwise the OpenAI-compatible server base URL.",
-          "min_confidence": "Needle must approve the proposed action at this confidence or higher (default 0.80). Does not apply to direct API calls.",
-          "timeout": "Maximum duration of each individual Needle or model request.",
-          "model": "Only for the direct OpenAI-compatible API. Leave empty to select the first advertised model."
+          "url": "Needle server address. When using an existing HA model, its endpoint and credentials are reused automatically.",
+          "min_confidence": "Needle must approve every action above this threshold. Applies to both modes.",
+          "timeout": "Maximum duration of each individual Needle or model request."
         }
       }
     },
     "error": {
-      "cannot_connect": "The configured Needle or model server cannot be reached.",
-      "invalid_response": "Invalid model endpoint response.",
+      "cannot_connect": "Needle server is unreachable.",
+      "invalid_response": "Invalid response from Needle server.",
       "invalid_url": "Enter a valid HTTP(S) server URL.",
       "no_provider_models": "No supported loaded llama.cpp model integration is available.",
       "invalid_provider_model": "Select an available loaded model."
@@ -48,7 +46,7 @@
     "step": {
       "init": {
         "title": "Choose routing mode",
-        "description": "Choose how tools are selected. Recommended: Needle with a model already configured in Home Assistant. The next step shows only the relevant settings.",
+        "description": "Choose the Needle routing mode. The next page shows only the settings it needs.",
         "data": {
           "backend": "Routing mode"
         },
@@ -64,22 +62,20 @@
           "routing_strategy": "Who should preselect the tools?",
           "url": "Server URL",
           "min_confidence": "Minimum Needle confidence",
-          "timeout": "Timeout per model request (seconds)",
-          "model": "Model ID (optional)"
+          "timeout": "Timeout per model request (seconds)"
         },
         "data_description": {
           "provider_model": "A configured llama.cpp model. Server URL, credentials and model ID are reused automatically from Home Assistant.",
           "routing_strategy": "Both options require independent Needle approval. The existing HA model generates the final tool arguments.",
-          "url": "Needle server address for Needle modes; otherwise the OpenAI-compatible server base URL.",
-          "min_confidence": "Needle must approve the proposed action at this confidence or higher (default 0.80). Does not apply to direct API calls.",
-          "timeout": "Maximum duration of each individual Needle or model request.",
-          "model": "Only for the direct OpenAI-compatible API. Leave empty to select the first advertised model."
+          "url": "Needle server address. When using an existing HA model, its endpoint and credentials are reused automatically.",
+          "min_confidence": "Needle must approve every action above this threshold. Applies to both modes.",
+          "timeout": "Maximum duration of each individual Needle or model request."
         }
       }
     },
     "error": {
-      "cannot_connect": "The configured Needle or model server cannot be reached.",
-      "invalid_response": "Invalid model endpoint response.",
+      "cannot_connect": "Needle server is unreachable.",
+      "invalid_response": "Invalid response from Needle server.",
       "invalid_url": "Enter a valid HTTP(S) server URL.",
       "no_provider_models": "No supported loaded llama.cpp model integration is available.",
       "invalid_provider_model": "Select an available loaded model."

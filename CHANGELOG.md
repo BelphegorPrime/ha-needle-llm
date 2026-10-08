@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.3 - 2026-10-08
+
+- Remove the model-only `openai_compatible` backend and associated client,
+  tests and configuration fields: every supported route now uses Needle.
+- Keep standalone Needle and Needle + existing Home Assistant model modes.
+- Keep the OpenAI tool-call *format adapter* needed to consult an existing
+  Home Assistant model provider before Needle approval.
+- Old standalone model-only config entries fail closed with a clear
+  reconfiguration error. Do not reinterpret their previous model URL as
+  a Needle server.
+- Explain why native Assist calls do not produce a Needle routing trace.
+
+
 ## 0.4.2 - 2026-10-08
 
 - Replace the overloaded options form with two guided pages: choose routing

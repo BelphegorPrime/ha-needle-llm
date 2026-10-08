@@ -1,19 +1,18 @@
-"""Needle / OpenAI-compatible tool router integration."""
+"""Needle tool router integration."""
 
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_URL
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import NeedleClient
 from .compat import register_api_compat
 from .const import (
-    BACKEND_OPENAI_COMPATIBLE,
     CONF_BACKEND,
     CONF_MIN_CONFIDENCE,
-    CONF_MODEL,
     CONF_PROVIDER_MODEL,
     CONF_ROUTING_STRATEGY,
     CONF_TIMEOUT,
@@ -21,11 +20,10 @@ from .const import (
     DEFAULT_MIN_CONFIDENCE,
     DEFAULT_TIMEOUT,
     DOMAIN,
-    normalize_backend,
+    SUPPORTED_BACKENDS,
 )
 from .ha_pipeline import DEFAULT_STRATEGY
 from .llm_api import NeedleAPI, api_id_for_router, api_name_for_url
-from .openai_client import OpenAICompatibleClient
 
 
 async def async_setup_entry(
@@ -35,12 +33,14 @@ async def async_setup_entry(
     """Register the routing API for the configured backend."""
     identity_url = entry.data[CONF_URL]
     base_url = entry.options.get(CONF_URL, identity_url)
-    backend = normalize_backend(
-        entry.options.get(
-            CONF_BACKEND, entry.data.get(CONF_BACKEND, DEFAULT_BACKEND)
-        )
+    backend = entry.options.get(
+        CONF_BACKEND, entry.data.get(CONF_BACKEND, DEFAULT_BACKEND)
     )
-    model = entry.options.get(CONF_MODEL, entry.data.get(CONF_MODEL, ""))
+    if backend not in SUPPORTED_BACKENDS:
+        raise ConfigEntryError(
+            "The old direct-model backend was removed. Configure this "
+            "integration to use a Needle server and a supported routing mode."
+        )
     provider_model = entry.options.get(
         CONF_PROVIDER_MODEL, entry.data.get(CONF_PROVIDER_MODEL, "")
     )
@@ -57,14 +57,9 @@ async def async_setup_entry(
         entry.data.get(CONF_MIN_CONFIDENCE, DEFAULT_MIN_CONFIDENCE),
     )
 
-    if backend == BACKEND_OPENAI_COMPATIBLE:
-        client = OpenAICompatibleClient(
-            async_get_clientsession(hass), base_url, request_timeout, model
-        )
-    else:
-        client = NeedleClient(
-            async_get_clientsession(hass), base_url, request_timeout
-        )
+    client = NeedleClient(
+        async_get_clientsession(hass), base_url, request_timeout
+    )
 
     api = NeedleAPI(
         hass,

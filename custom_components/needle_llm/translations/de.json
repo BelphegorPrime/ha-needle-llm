@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Routing-Modus auswählen",
-        "description": "Wähle, wie die Tool-Auswahl erfolgt. Empfohlen: Needle zusammen mit einem bereits eingerichteten Home-Assistant-Modell. Im nächsten Schritt erscheinen nur die dafür nötigen Einstellungen.",
+        "description": "Wähle zwischen Needle allein oder Needle mit einem vorhandenen Home-Assistant-Modell. Beide Modi verwenden zwingend Needle.",
         "data": {
           "backend": "Routing-Modus"
         },
@@ -20,22 +20,20 @@
           "routing_strategy": "Wer soll die Tools vorauswählen?",
           "url": "Server-URL",
           "min_confidence": "Mindest-Confidence von Needle",
-          "timeout": "Timeout pro Modellaufruf (Sekunden)",
-          "model": "Modell-ID (optional)"
+          "timeout": "Timeout pro Modellaufruf (Sekunden)"
         },
         "data_description": {
           "provider_model": "Bereits eingerichtetes llama.cpp-Modell. URL, API-Key und Modell werden automatisch aus Home Assistant übernommen.",
           "routing_strategy": "Beide Varianten benötigen Needles unabhängige Freigabe. Die finale Argumentgenerierung übernimmt das HA-Modell.",
-          "url": "Needle-Adresse für Needle-Modi, sonst Basis-URL des OpenAI-kompatiblen Endpunkts.",
-          "min_confidence": "Needle muss die vorausgewählte Aktion mit mindestens diesem Wert bestätigen (Standard 0,80). Nicht für direkte API-Aufrufe.",
-          "timeout": "Wie lange ein einzelner Needle- oder Modellaufruf höchstens dauern darf.",
-          "model": "Nur für die direkte OpenAI-kompatible API. Leer lassen, um das erste angebotene Modell zu verwenden."
+          "url": "Adresse des Needle-Servers. Beim bestehenden HA-Modell werden dessen Verbindung und Zugangsdaten automatisch übernommen.",
+          "min_confidence": "Needle muss jede Aktion über diesem Schwellwert freigeben. Für beide Modi gültig.",
+          "timeout": "Wie lange ein einzelner Needle- oder Modellaufruf höchstens dauern darf."
         }
       }
     },
     "error": {
-      "cannot_connect": "Der konfigurierte Needle- oder Modellserver ist nicht erreichbar.",
-      "invalid_response": "Ungültige Modell-Endpunkt-Antwort.",
+      "cannot_connect": "Needle-Server ist nicht erreichbar.",
+      "invalid_response": "Ungültige Antwort vom Needle-Server.",
       "invalid_url": "Bitte eine gültige HTTP(S)-Adresse eingeben.",
       "no_provider_models": "Keine unterstützte geladene llama.cpp-Modellintegration gefunden.",
       "invalid_provider_model": "Bitte ein vorhandenes geladenes Modell auswählen."
@@ -48,7 +46,7 @@
     "step": {
       "init": {
         "title": "Routing-Modus auswählen",
-        "description": "Wähle, wie die Tool-Auswahl erfolgt. Empfohlen: Needle zusammen mit einem bereits eingerichteten Home-Assistant-Modell. Im nächsten Schritt erscheinen nur die dafür nötigen Einstellungen.",
+        "description": "Wähle den Needle-Routing-Modus. Der nächste Schritt enthält nur die dafür notwendigen Einstellungen.",
         "data": {
           "backend": "Routing-Modus"
         },
@@ -64,22 +62,20 @@
           "routing_strategy": "Wer soll die Tools vorauswählen?",
           "url": "Server-URL",
           "min_confidence": "Mindest-Confidence von Needle",
-          "timeout": "Timeout pro Modellaufruf (Sekunden)",
-          "model": "Modell-ID (optional)"
+          "timeout": "Timeout pro Modellaufruf (Sekunden)"
         },
         "data_description": {
           "provider_model": "Bereits eingerichtetes llama.cpp-Modell. URL, API-Key und Modell werden automatisch aus Home Assistant übernommen.",
           "routing_strategy": "Beide Varianten benötigen Needles unabhängige Freigabe. Die finale Argumentgenerierung übernimmt das HA-Modell.",
-          "url": "Needle-Adresse für Needle-Modi, sonst Basis-URL des OpenAI-kompatiblen Endpunkts.",
-          "min_confidence": "Needle muss die vorausgewählte Aktion mit mindestens diesem Wert bestätigen (Standard 0,80). Nicht für direkte API-Aufrufe.",
-          "timeout": "Wie lange ein einzelner Needle- oder Modellaufruf höchstens dauern darf.",
-          "model": "Nur für die direkte OpenAI-kompatible API. Leer lassen, um das erste angebotene Modell zu verwenden."
+          "url": "Adresse des Needle-Servers. Beim bestehenden HA-Modell werden dessen Verbindung und Zugangsdaten automatisch übernommen.",
+          "min_confidence": "Needle muss jede Aktion über diesem Schwellwert freigeben. Für beide Modi gültig.",
+          "timeout": "Wie lange ein einzelner Needle- oder Modellaufruf höchstens dauern darf."
         }
       }
     },
     "error": {
-      "cannot_connect": "Der konfigurierte Needle- oder Modellserver ist nicht erreichbar.",
-      "invalid_response": "Ungültige Modell-Endpunkt-Antwort.",
+      "cannot_connect": "Needle-Server ist nicht erreichbar.",
+      "invalid_response": "Ungültige Antwort vom Needle-Server.",
       "invalid_url": "Bitte eine gültige HTTP(S)-Adresse eingeben.",
       "no_provider_models": "Keine unterstützte geladene llama.cpp-Modellintegration gefunden.",
       "invalid_provider_model": "Bitte ein vorhandenes geladenes Modell auswählen."

@@ -20,10 +20,8 @@ from .client import NeedleClient, NeedleClientError
 from .const import (
     BACKEND_HA_PROVIDER,
     BACKEND_NEEDLE,
-    BACKEND_OPENAI_COMPATIBLE,
     CONF_BACKEND,
     CONF_MIN_CONFIDENCE,
-    CONF_MODEL,
     CONF_PROVIDER_MODEL,
     CONF_ROUTING_STRATEGY,
     CONF_TIMEOUT,
@@ -31,7 +29,8 @@ from .const import (
     DEFAULT_MIN_CONFIDENCE,
     DEFAULT_TIMEOUT,
     DOMAIN,
-    normalize_backend,
+    SUPPORTED_BACKENDS,
+    UNSUPPORTED_LEGACY_BACKENDS,
 )
 from .ha_pipeline import (
     DEFAULT_STRATEGY,
@@ -39,12 +38,10 @@ from .ha_pipeline import (
     STRATEGY_NEEDLE_FIRST,
 )
 from .ha_provider import available_provider_models
-from .openai_client import OpenAICompatibleClient, OpenAICompatibleClientError
 
 _BACKEND_LABELS = {
     BACKEND_HA_PROVIDER: "Needle + existing Home Assistant model (recommended)",
     BACKEND_NEEDLE: "Needle only (standalone)",
-    BACKEND_OPENAI_COMPATIBLE: "Direct OpenAI-compatible API (without Needle)",
 }
 _STRATEGY_LABELS = {
     STRATEGY_MODEL_FIRST: "HA model chooses tools, Needle verifies",
@@ -58,10 +55,6 @@ _MODE_HINTS = {
     BACKEND_NEEDLE: (
         "Needle selects the tool and generates its arguments. "
         "Only the Needle server address is required."
-    ),
-    BACKEND_OPENAI_COMPATIBLE: (
-        "The model handles routing directly without Needle. "
-        "Enter the OpenAI-compatible inference server URL."
     ),
 }
 
@@ -141,10 +134,7 @@ def _settings_schema(
             ),
         )] = vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0))
     else:
-        fields[url_marker] = str
-        fields[vol.Optional(
-            CONF_MODEL, default=values.get(CONF_MODEL, "")
-        )] = str
+        raise vol.Invalid("Unsupported routing mode; Needle is required")
 
     fields[vol.Required(
         CONF_TIMEOUT, default=values.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
@@ -162,30 +152,23 @@ def _entry_title(base_url: str, backend: str) -> str:
     location = urlparse(base_url).netloc or base_url
     if backend == BACKEND_HA_PROVIDER:
         name = "Needle + HA model"
-    elif backend == BACKEND_OPENAI_COMPATIBLE:
-        name = "OpenAI-compatible"
     else:
         name = "Needle"
     return f"{name} @ {location}"
 
 
 async def _async_validate_connection(
-    hass, base_url: str, request_timeout: int, backend: str, model: str
+    hass, base_url: str, request_timeout: int
 ) -> str | None:
-    """Validate the endpoint while keeping the provider's URL/keys private."""
+    """Require a genuine Needle server; never accept model-only endpoints."""
     if not base_url.startswith(("http://", "https://")):
         return "invalid_url"
-    if backend == BACKEND_OPENAI_COMPATIBLE:
-        client = OpenAICompatibleClient(
-            async_get_clientsession(hass), base_url, request_timeout, model
-        )
-    else:
-        client = NeedleClient(
-            async_get_clientsession(hass), base_url, request_timeout
-        )
+    client = NeedleClient(
+        async_get_clientsession(hass), base_url, request_timeout
+    )
     try:
         details = await client.async_get_model()
-    except (NeedleClientError, OpenAICompatibleClientError):
+    except NeedleClientError:
         return "cannot_connect"
     if not isinstance(details.get("name"), str) or not details["name"]:
         return "invalid_response"
@@ -208,6 +191,7 @@ def _effective_values(backend: str, submitted: dict, previous: dict) -> dict:
     """Preserve hidden fields for switching modes without re-entering them."""
     result = dict(previous)
     result.update(submitted)
+    result.pop("model", None)  # Discard obsolete standalone-model setting.
     result[CONF_BACKEND] = backend
     return result
 
@@ -234,9 +218,7 @@ class NeedleLLMConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.ConfigFlowResult:
         """Select the routing mode before showing the server settings."""
         if user_input is not None:
-            self._selected_backend = normalize_backend(
-                user_input[CONF_BACKEND]
-            )
+            self._selected_backend = user_input[CONF_BACKEND]
             return await self.async_step_settings()
         return self.async_show_form(
             step_id="user",
@@ -252,11 +234,10 @@ class NeedleLLMConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             url = _normalize_url(user_input[CONF_URL])
             provider_model = user_input.get(CONF_PROVIDER_MODEL, "")
-            model = user_input.get(CONF_MODEL, "")
             error = _provider_error(self.hass, backend, provider_model)
             if error is None:
                 error = await _async_validate_connection(
-                    self.hass, url, user_input[CONF_TIMEOUT], backend, model
+                    self.hass, url, user_input[CONF_TIMEOUT]
                 )
             if error is not None:
                 errors["base"] = error
@@ -275,7 +256,6 @@ class NeedleLLMConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         {
                             CONF_MIN_CONFIDENCE: DEFAULT_MIN_CONFIDENCE,
                             CONF_ROUTING_STRATEGY: DEFAULT_STRATEGY,
-                            CONF_MODEL: "",
                             CONF_PROVIDER_MODEL: "",
                         },
                     ),
@@ -306,18 +286,21 @@ class NeedleLLMOptionsFlow(config_entries.OptionsFlowWithConfigEntry):
             **config_entry.data,
             **config_entry.options,
         }
-        self._selected_backend = normalize_backend(
-            self._current.get(CONF_BACKEND, DEFAULT_BACKEND)
+        saved_backend = self._current.get(CONF_BACKEND, DEFAULT_BACKEND)
+        self._selected_backend = (
+            saved_backend if saved_backend in SUPPORTED_BACKENDS
+            else BACKEND_HA_PROVIDER
         )
+        if saved_backend in UNSUPPORTED_LEGACY_BACKENDS:
+            # The old direct-model URL is not a Needle URL. Never prefill it.
+            self._current.pop(CONF_URL, None)
 
     async def async_step_init(
         self, user_input: dict | None = None
     ) -> config_entries.ConfigFlowResult:
         """First choose which routing strategy family to configure."""
         if user_input is not None:
-            self._selected_backend = normalize_backend(
-                user_input[CONF_BACKEND]
-            )
+            self._selected_backend = user_input[CONF_BACKEND]
             return await self.async_step_settings()
         return self.async_show_form(
             step_id="init",
@@ -336,13 +319,10 @@ class NeedleLLMOptionsFlow(config_entries.OptionsFlowWithConfigEntry):
                 CONF_PROVIDER_MODEL,
                 self._current.get(CONF_PROVIDER_MODEL, ""),
             )
-            model = user_input.get(
-                CONF_MODEL, self._current.get(CONF_MODEL, "")
-            )
             error = _provider_error(self.hass, backend, provider_model)
             if error is None:
                 error = await _async_validate_connection(
-                    self.hass, url, user_input[CONF_TIMEOUT], backend, model
+                    self.hass, url, user_input[CONF_TIMEOUT]
                 )
             if error is not None:
                 errors["base"] = error
