@@ -237,6 +237,24 @@ If a Home Assistant tool schema cannot be serialized into a JSON schema usable
 by Needle, that tool is skipped and an error is written to the Home Assistant
 debug log rather than weakening validation.
 
+## Diagnostics
+
+Home Assistant's **Show details** output includes structured diagnostics for
+both successful and rejected routes. Depending on the failure stage this can
+include:
+
+- reset and `/complete` timings;
+- transport exception type and HTTP status;
+- Needle confidence, reasoning, validation and suppressed calls;
+- Needle prefill/decode throughput and peak RAM;
+- number of native Assist tools made available to Needle;
+- tools skipped because their schema could not be serialized;
+- selected native Home Assistant tool and arguments;
+- the stage at which execution stopped.
+
+This is intended to make routing failures diagnosable without lowering the
+confidence threshold or enabling debug logging first.
+
 ## Stateless routing
 
 Needle LLM explicitly calls `POST /reset` before every `POST /complete`.
@@ -288,7 +306,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.1.4
+0.1.5
 ```
 
 ## License

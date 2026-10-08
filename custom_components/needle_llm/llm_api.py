@@ -68,6 +68,7 @@ class NeedleRouteTool(llm.Tool):
 
         tools_by_name = {tool.name: tool for tool in assist_api.tools}
         needle_tools: list[dict[str, Any]] = []
+        skipped_tools: list[str] = []
 
         for tool in assist_api.tools:
             try:
@@ -76,6 +77,7 @@ class NeedleRouteTool(llm.Tool):
                     getattr(assist_api, "custom_serializer", None),
                 )
             except Exception:  # noqa: BLE001
+                skipped_tools.append(tool.name)
                 _LOGGER.exception(
                     "Unable to serialize Home Assistant LLM tool %s",
                     tool.name,
@@ -98,13 +100,29 @@ class NeedleRouteTool(llm.Tool):
 
         allowed_tools = {tool["name"] for tool in needle_tools}
 
+        diagnostics = {
+            "available_tool_count": len(needle_tools),
+            "skipped_tool_count": len(skipped_tools),
+            "skipped_tools": skipped_tools,
+        }
+
         try:
-            result = await self._client.async_complete(
+            result, transport = await self._client.async_complete(
                 tools=needle_tools,
                 query=query,
             )
         except NeedleClientError as err:
-            return _error(str(err))
+            return _error(
+                str(err),
+                stage=err.stage,
+                diagnostics={
+                    **diagnostics,
+                    "transport": err.as_dict(),
+                },
+            )
+
+        diagnostics["transport"] = transport
+        diagnostics["needle"] = _needle_diagnostics(result)
 
         try:
             route = approve_route(
@@ -118,37 +136,62 @@ class NeedleRouteTool(llm.Tool):
                     "executed": False,
                     "reason": str(err),
                     "confidence": result.get("confidence"),
-                    "needle_type": result.get("type"),
-                    "function_calls": result.get("function_calls") or [],
-                    "suppressed_calls": result.get("suppressed_calls") or [],
-                    "reasoning": result.get("reasoning"),
-                    "validation": result.get("validation") or {},
-                    "available_tool_count": len(needle_tools),
+                    "stage": "validation",
+                    "diagnostics": diagnostics,
                 },
                 error=True,
             )
 
         target_tool = tools_by_name.get(route.tool)
         if target_tool is None:
-            return _error("Needle selected a tool that is no longer available")
+            return _error(
+                "Needle selected a tool that is no longer available",
+                stage="tool_lookup",
+                diagnostics=diagnostics,
+            )
 
         try:
             target_tool.parameters(route.arguments)
         except Exception as err:  # noqa: BLE001
-            return _error(f"Home Assistant rejected Needle arguments: {err}")
+            return _error(
+                f"Home Assistant rejected Needle arguments: {err}",
+                stage="argument_validation",
+                diagnostics={
+                    **diagnostics,
+                    "selected_tool": route.tool,
+                    "selected_arguments": route.arguments,
+                },
+            )
 
         try:
             native_result = await assist_api.async_call_tool(
                 llm.ToolInput(route.tool, route.arguments)
             )
         except HomeAssistantError as err:
-            return _error(f"Home Assistant rejected the routed tool call: {err}")
+            return _error(
+                f"Home Assistant rejected the routed tool call: {err}",
+                stage="home_assistant_execution",
+                diagnostics={
+                    **diagnostics,
+                    "selected_tool": route.tool,
+                    "selected_arguments": route.arguments,
+                },
+            )
         except Exception as err:  # noqa: BLE001
             _LOGGER.exception(
                 "Home Assistant tool %s failed",
                 route.tool,
             )
-            return _error(f"Home Assistant tool failed: {err}")
+            return _error(
+                f"Home Assistant tool failed: {err}",
+                stage="home_assistant_execution",
+                diagnostics={
+                    **diagnostics,
+                    "selected_tool": route.tool,
+                    "selected_arguments": route.arguments,
+                    "exception_type": type(err).__name__,
+                },
+            )
 
         native_data, native_error = normalize_tool_result(native_result)
 
@@ -159,6 +202,12 @@ class NeedleRouteTool(llm.Tool):
                 "needle_confidence": route.confidence,
                 "arguments": route.arguments,
                 "home_assistant": native_data,
+                "diagnostics": {
+                    **diagnostics,
+                    "stage": "completed",
+                    "selected_tool": route.tool,
+                    "selected_arguments": route.arguments,
+                },
             },
             error=native_error,
         )
@@ -227,12 +276,36 @@ def api_name_for_url(base_url: str) -> str:
     return f"Needle LLM @ {location}"
 
 
-def _error(reason: str) -> Any:
-    """Return a standardized failed tool result."""
+def _needle_diagnostics(result: dict[str, Any]) -> dict[str, Any]:
+    """Extract useful Needle diagnostics without returning the whole payload."""
+    return {
+        "type": result.get("type"),
+        "success": result.get("success"),
+        "confidence": result.get("confidence"),
+        "reason": result.get("reason"),
+        "reasoning": result.get("reasoning"),
+        "function_calls": result.get("function_calls") or [],
+        "suppressed_calls": result.get("suppressed_calls") or [],
+        "validation": result.get("validation") or {},
+        "prefill_tps": result.get("prefill_tps"),
+        "decode_tps": result.get("decode_tps"),
+        "peak_ram_mb": result.get("peak_ram_mb"),
+    }
+
+
+def _error(
+    reason: str,
+    *,
+    stage: str = "integration",
+    diagnostics: dict[str, Any] | None = None,
+) -> Any:
+    """Return a standardized failed tool result with diagnostics."""
     return make_tool_result(
         {
             "executed": False,
+            "stage": stage,
             "reason": reason,
+            "diagnostics": diagnostics or {},
         },
         error=True,
     )

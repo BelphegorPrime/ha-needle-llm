@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.5 - 2026-10-08
+
+- Greatly expand Home Assistant "Show details" diagnostics.
+- Include the failure stage, HTTP/transport error type, response status/body,
+  reset and completion timings, available/skipped tool counts, Needle routing
+  details, performance metrics and the selected Home Assistant tool/arguments.
+- Ensure timeout/disconnect errors always include a useful exception type even
+  when the underlying Python exception has an empty message.
+
+
 ## 0.1.4 - 2026-10-08
 
 - Restore an explicit `POST /reset` before every `/complete` request.
