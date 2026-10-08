@@ -11,7 +11,10 @@ from custom_components.needle_llm.validation import (
 )
 
 
-def _response(name: str = "intent__HassTurnOff", arguments: str = '{"name":"Wohnzimmerlampe"}') -> dict:
+def _response(
+    name: str = "intent__HassTurnOff",
+    arguments: str = '{"name":"Wohnzimmerlampe"}',
+) -> dict:
     return {
         "choices": [
             {
@@ -33,7 +36,13 @@ def _response(name: str = "intent__HassTurnOff", arguments: str = '{"name":"Wohn
 def test_tool_schema_mapping() -> None:
     """Preserve the native HA schema when calling OpenAI tools."""
     schema = {"type": "object", "properties": {"name": {"type": "string"}}}
-    native = [{"name": "intent__HassTurnOff", "description": "Turn off", "parameters": schema}]
+    native = [
+        {
+            "name": "intent__HassTurnOff",
+            "description": "Turn off",
+            "parameters": schema,
+        }
+    ]
     tools = openai_tools(native)
     assert tools[0]["type"] == "function"
     assert tools[0]["function"]["name"] == "intent__HassTurnOff"
@@ -58,7 +67,14 @@ def test_approve_single_native_tool_call() -> None:
         (_response("not_available"), "unavailable tool"),
         (_response(arguments="{bad json"), "malformed argument JSON"),
         (_response(arguments=json.dumps([1, 2])), "JSON object"),
-        ({"choices": [{**_response()["choices"][0], "finish_reason": "length"}]}, "incomplete"),
+        (
+            {
+                "choices": [
+                    {**_response()["choices"][0], "finish_reason": "length"}
+                ]
+            },
+            "incomplete",
+        ),
     ],
 )
 def test_fail_closed_on_invalid_model_output(body: dict, reason: str) -> None:

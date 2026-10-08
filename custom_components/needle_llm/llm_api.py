@@ -549,7 +549,7 @@ class NeedleAPI(llm.API):
             api_prompt=(
                 "For any request about Home Assistant that requires current "
                 f"home data or an action, call {tool_name}. Pass the user's "
-                "original request unchanged. NeedleRoute delegates only to "
+                "original request unchanged. The route tool delegates only to "
                 "tools provided by Home Assistant's native Assist API. Never "
                 "claim success unless the result contains executed=true. "
                 "If executed=false and no native Home Assistant tool ran, "

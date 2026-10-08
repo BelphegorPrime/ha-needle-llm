@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Collection
 from dataclasses import dataclass
-import json
 from typing import Any
 
 
