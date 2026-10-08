@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3 - 2026-10-08
+
+- Move dynamic narrowing unit tests into the established validation test module
+  to satisfy Ruff/isort consistently across the supported Python versions.
+- Releases are now created only after the full Validate workflow succeeds.
+
+
 ## 0.2.2 - 2026-10-08
 
 - Fix Ruff/isort spacing in the dynamic narrowing test module.

@@ -140,6 +140,11 @@ The config flow asks for:
 | Minimum confidence | `0.80` | Minimum Needle confidence required before a routed call can execute |
 | Request timeout | `30 s` | Timeout for one Needle HTTP request |
 
+After setup you can change the URL, minimum confidence and request timeout via
+**Settings -> Devices & services -> Needle LLM -> Configure**. Saving options
+reloads the integration automatically. The timeout can be set up to 600
+seconds.
+
 Home Assistant Core runs in a separate container from add-ons, so do not use
 `localhost` unless your deployment explicitly makes that work.
 
@@ -325,7 +330,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.2.2
+0.2.3
 ```
 
 ## License
