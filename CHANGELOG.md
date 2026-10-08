@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.7 - 2026-10-08
+
+- Narrow final Needle argument schemas when the original utterance contains
+  exactly one name of a currently Assist-exposed Home Assistant entity.
+- Remove only the optional device_class field from the Needle-facing schema,
+  avoiding noisy repeated enum values and hallucinated "blind" classes.
+- Preserve the original native schema for Home Assistant validation and
+  reject target name/domain mismatches before invoking any native tool.
+- Remain language-independent: match names verbatim rather than translating
+  or hard-coding language-specific light and switch semantics.
+- Expose target-schema narrowing decisions in NeedleRoute diagnostics.
+
+
 ## 0.2.6 - 2026-10-08
 
 - Guard against hallucinated device_class filters even when Needle reports

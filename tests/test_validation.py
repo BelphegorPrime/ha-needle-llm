@@ -10,6 +10,7 @@ from custom_components.needle_llm.routing import (
 )
 from custom_components.needle_llm.target_guard import (
     TargetGuardRejected,
+    find_unique_mentioned_entity,
     reconcile_named_target,
 )
 from custom_components.needle_llm.validation import (
@@ -324,3 +325,70 @@ def test_never_repair_conflicting_domain() -> None:
             {"properties": {"domain": {}}},
             [{"name": "Wohnzimmerlampe", "entity_id": "light.lamp"}],
         )
+
+
+
+def test_unique_literal_exposed_target_can_omit_optional_device_class() -> None:
+    """Optional class enums are unnecessary for uniquely named targets."""
+    schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "device_class": {"type": "array", "items": {"enum": ["blind"]}},
+            "domain": {"type": "array"},
+        },
+        "required": ["name"],
+    }
+    tool = {
+        "name": "intent__HassTurnOff",
+        "description": "Turn off an entity",
+        "parameters": schema,
+    }
+    result = execution_tool(tool, unique_named_target=True)
+
+    assert "device_class" not in result["parameters"]["properties"]
+    assert "device_class" in schema["properties"]
+    assert result["parameters"]["required"] == ["name"]
+
+
+def test_dont_strip_required_class_or_ambiguous_target() -> None:
+    """No target guessing or removal of required native schema fields."""
+    params = {
+        "type": "object",
+        "properties": {"name": {}, "device_class": {}},
+        "required": ["device_class"],
+    }
+    tool = {"name": "test", "description": "test", "parameters": params}
+    result = execution_tool(tool, unique_named_target=True)
+    assert "device_class" in result["parameters"]["properties"]
+    unchanged = execution_tool(tool, unique_named_target=False)
+    assert unchanged["parameters"] is params
+
+
+def test_unique_exposed_literal_name_across_languages() -> None:
+    """Device labels remain literal even when user language differs."""
+    entities = [
+        {"name": "Wohnzimmerlampe", "entity_id": "light.wohnzimmerlampe"},
+        {"name": "Hallway light", "entity_id": "light.hallway"},
+    ]
+    found = find_unique_mentioned_entity(
+        "Turn off Wohnzimmerlampe", entities
+    )
+    assert found == entities[0]
+    assert find_unique_mentioned_entity(
+        "Turn off the hallway", entities
+    ) is None
+
+
+def test_similar_or_ambiguous_exposed_names_are_not_unique() -> None:
+    """A short name inside another entity name is not sufficient."""
+    entities = [
+        {"name": "Tor", "entity_id": "switch.gate"},
+        {"name": "Einfahrtstor", "entity_id": "switch.driveway"},
+    ]
+    assert find_unique_mentioned_entity(
+        "Öffne das Einfahrtstor", entities
+    ) == entities[1]
+    assert find_unique_mentioned_entity(
+        "Öffne Tor und Einfahrtstor", entities
+    ) is None

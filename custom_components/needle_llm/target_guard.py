@@ -111,3 +111,22 @@ def reconcile_named_target(
         "domain_constraint": domain if "domain" in properties else None,
     }
     return modified, details
+
+
+
+def find_unique_mentioned_entity(
+    query: str,
+    exposed_entities: Collection[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Find exactly one exposed entity whose full name is in the utterance.
+
+    This is a conservative, language-independent literal match, not fuzzy
+    matching, translation or a guess about what the user intended.
+    """
+    matches = [
+        entity
+        for entity in exposed_entities
+        if isinstance(entity.get("name"), str)
+        and _mentions_exact_name(query, entity["name"])
+    ]
+    return matches[0] if len(matches) == 1 else None

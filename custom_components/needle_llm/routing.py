@@ -105,15 +105,38 @@ def build_routing_query(query: str) -> str:
 
 def execution_tool(
     tool: dict[str, Any],
+    *,
+    unique_named_target: bool = False,
 ) -> dict[str, Any]:
-    """Restore the unmodified native tool description and parameter schema.
+    """Build a minimal safe schema for argument extraction.
 
-    Discovery-only guidance must never pollute the parameter-extraction pass.
+    A uniquely named exposed entity does not need an optional device_class
+    classifier: the user has already specified the target by name. Omitting
+    this optional field avoids feeding Needle huge repetitive class enums.
+    The original schema is retained for native Home Assistant validation.
     """
+    parameters = tool["parameters"]
+    if unique_named_target:
+        properties = parameters.get("properties")
+        required = parameters.get("required", [])
+        if (
+            isinstance(properties, dict)
+            and "device_class" in properties
+            and "device_class" not in required
+        ):
+            parameters = {
+                **parameters,
+                "properties": {
+                    key: value
+                    for key, value in properties.items()
+                    if key != "device_class"
+                },
+            }
+
     return {
         "name": tool["name"],
         "description": tool["description"],
-        "parameters": tool["parameters"],
+        "parameters": parameters,
     }
 
 

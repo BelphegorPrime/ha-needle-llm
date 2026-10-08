@@ -334,9 +334,21 @@ Assistant add-on.
 Current version:
 
 ```text
-0.2.6
+0.2.7
 ```
 
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+
+### Target-aware schema simplification
+
+For a user utterance that **literally names exactly one Assist-exposed entity**,
+the final Needle tool schema omits optional `device_class` classification
+arguments. Home Assistant still receives arguments validated against the
+**full native schema**. Generated names/domains that contradict the uniquely
+named exposed entity are rejected before an action is dispatched.
+
+When no unique exposed entity name is present, the original full schema is
+used unchanged; low-confidence and suppressed Needle calls are never executed.

@@ -28,7 +28,11 @@ from .routing import (
     candidate_tool_names,
     execution_tool,
 )
-from .target_guard import TargetGuardRejected, reconcile_named_target
+from .target_guard import (
+    TargetGuardRejected,
+    find_unique_mentioned_entity,
+    reconcile_named_target,
+)
 from .validation import RouteRejected, approve_route
 
 _LOGGER = logging.getLogger(__name__)
@@ -123,7 +127,7 @@ class NeedleRouteTool(llm.Tool):
         discovery_tools = build_discovery_tools(needle_tools)
         routed_query = build_routing_query(query)
 
-        diagnostics["routing_strategy"] = "two_stage_target_guard_v4"
+        diagnostics["routing_strategy"] = "two_stage_unique_target_schema_v5"
 
         try:
             discovery_result, discovery_transport = (
@@ -162,10 +166,56 @@ class NeedleRouteTool(llm.Tool):
                 diagnostics=diagnostics,
             )
 
+        # Only simplify optional targeting fields when the original utterance
+        # literally names exactly one entity exposed to this Assist assistant.
+        # No device type, translated noun, or fuzzy entity guess is assumed.
+        mentioned_entities: list[dict[str, Any]] = []
+        for state in hass.states.async_all():
+            if not async_should_expose(
+                hass, llm_context.assistant, state.entity_id
+            ):
+                continue
+            mentioned_entities.append(
+                {
+                    "name": state.name,
+                    "entity_id": state.entity_id,
+                    "device_class": state.attributes.get("device_class"),
+                }
+            )
+
+        matched_target = find_unique_mentioned_entity(
+            query, mentioned_entities
+        )
         narrowed_tools = [
-            execution_tool(tools_by_serialized_name[name])
+            execution_tool(
+                tools_by_serialized_name[name],
+                unique_named_target=matched_target is not None,
+            )
             for name in candidates
         ]
+        removed_fields = [
+            {
+                "tool": name,
+                "fields": ["device_class"],
+            }
+            for name, narrowed in zip(
+                candidates, narrowed_tools, strict=True
+            )
+            if "device_class"
+            in tools_by_serialized_name[name]["parameters"].get(
+                "properties", {}
+            )
+            and "device_class" not in narrowed["parameters"].get(
+                "properties", {}
+            )
+        ]
+        diagnostics["target_schema"] = {
+            "unique_exposed_name_match": matched_target is not None,
+            "matched_entity_id": (
+                matched_target["entity_id"] if matched_target else None
+            ),
+            "removed_optional_fields": removed_fields,
+        }
 
         try:
             # Discovery needs action-selection guidance. Once the native
@@ -228,6 +278,46 @@ class NeedleRouteTool(llm.Tool):
             )
 
         arguments = route.arguments
+        if matched_target is not None and removed_fields:
+            # The simplified schema may only be used for this exact target.
+            # Never allow an unrelated name/area to gain execution authority.
+            intended_name = matched_target["name"]
+            supplied_name = arguments.get("name")
+            if (
+                not isinstance(supplied_name, str)
+                or " ".join(supplied_name.casefold().split())
+                != " ".join(intended_name.casefold().split())
+            ):
+                return _error(
+                    "Needle's target name differs from the uniquely matched "
+                    "exposed entity; no action was executed",
+                    stage="target_validation",
+                    diagnostics={
+                        **diagnostics,
+                        "selected_tool": route.tool,
+                        "selected_arguments": arguments,
+                    },
+                )
+        if matched_target is not None and removed_fields:
+            actual_domain = matched_target["entity_id"].split(".", 1)[0]
+            if "domain" in arguments:
+                value = arguments["domain"]
+                domains = value if isinstance(value, list) else [value]
+                if domains != [actual_domain]:
+                    return _error(
+                        "Needle's domain conflicts with the named exposed entity",
+                        stage="target_validation",
+                        diagnostics={
+                            **diagnostics,
+                            "selected_tool": route.tool,
+                            "selected_arguments": arguments,
+                        },
+                    )
+            elif "domain" in tools_by_serialized_name[route.tool][
+                "parameters"
+            ].get("properties", {}):
+                arguments = {**arguments, "domain": [actual_domain]}
+
         if "device_class" in arguments:
             name = arguments.get("name")
             exposed_entities: list[dict[str, Any]] = []
