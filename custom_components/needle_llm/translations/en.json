@@ -4,18 +4,16 @@
     "step": {
       "user": {
         "title": "Connect to Needle",
-        "description": "Connect Home Assistant to a local Needle server. The server must provide /model, /reset and /complete.",
+        "description": "Connect Home Assistant to a local Needle server.",
         "data": {
           "url": "Needle URL",
           "min_confidence": "Minimum confidence",
-          "reset_before_call": "Reset Needle before every request",
           "timeout": "Request timeout (seconds)"
         },
         "data_description": {
           "url": "For example http://192.168.1.50:7860",
           "min_confidence": "Calls below this confidence are rejected.",
-          "reset_before_call": "Recommended. Keeps Needle stateless and lets Home Assistant own conversation history.",
-          "timeout": "Maximum time for one Needle HTTP request."
+          "timeout": "Maximum time for one Needle HTTP request. Up to 600 seconds."
         }
       }
     },
@@ -26,6 +24,29 @@
     },
     "abort": {
       "already_configured": "This Needle server is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configure Needle LLM",
+        "description": "Change connection and routing settings. The connection is validated before saving.",
+        "data": {
+          "url": "Needle URL",
+          "min_confidence": "Minimum confidence",
+          "timeout": "Request timeout (seconds)"
+        },
+        "data_description": {
+          "url": "Base URL of the Needle server.",
+          "min_confidence": "Calls below this confidence are rejected.",
+          "timeout": "Maximum time for one Needle HTTP request. Up to 600 seconds."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to Needle.",
+      "invalid_response": "Needle returned an invalid /model response.",
+      "invalid_url": "Enter an http:// or https:// URL."
     }
   }
 }

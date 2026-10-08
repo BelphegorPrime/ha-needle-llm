@@ -4,18 +4,16 @@
     "step": {
       "user": {
         "title": "Mit Needle verbinden",
-        "description": "Verbinde Home Assistant mit einem lokalen Needle-Server. Der Server muss /model, /reset und /complete bereitstellen.",
+        "description": "Verbinde Home Assistant mit einem lokalen Needle-Server.",
         "data": {
           "url": "Needle-URL",
           "min_confidence": "Minimale Confidence",
-          "reset_before_call": "Needle vor jeder Anfrage zurücksetzen",
           "timeout": "Request-Timeout (Sekunden)"
         },
         "data_description": {
           "url": "Zum Beispiel http://192.168.1.50:7860",
           "min_confidence": "Aufrufe unterhalb dieses Werts werden abgelehnt.",
-          "reset_before_call": "Empfohlen. Needle bleibt zustandslos und Home Assistant verwaltet den Gesprächskontext.",
-          "timeout": "Maximale Dauer einer Needle-HTTP-Anfrage."
+          "timeout": "Maximale Dauer einer Needle-HTTP-Anfrage. Bis zu 600 Sekunden."
         }
       }
     },
@@ -26,6 +24,29 @@
     },
     "abort": {
       "already_configured": "Dieser Needle-Server ist bereits konfiguriert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Needle LLM konfigurieren",
+        "description": "Ändere Verbindung und Routing-Einstellungen. Die Verbindung wird vor dem Speichern geprüft.",
+        "data": {
+          "url": "Needle-URL",
+          "min_confidence": "Minimale Confidence",
+          "timeout": "Request-Timeout (Sekunden)"
+        },
+        "data_description": {
+          "url": "Basis-URL des Needle-Servers.",
+          "min_confidence": "Aufrufe unterhalb dieses Werts werden abgelehnt.",
+          "timeout": "Maximale Dauer einer Needle-HTTP-Anfrage. Bis zu 600 Sekunden."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zu Needle nicht möglich.",
+      "invalid_response": "Needle hat eine ungültige /model-Antwort geliefert.",
+      "invalid_url": "Bitte eine http://- oder https://-URL eingeben."
     }
   }
 }

@@ -24,26 +24,33 @@ async def async_setup_entry(
     entry: ConfigEntry,
 ) -> bool:
     """Set up Needle LLM from a config entry."""
-    base_url = entry.data[CONF_URL]
+    identity_url = entry.data[CONF_URL]
+    base_url = entry.options.get(CONF_URL, identity_url)
+    timeout = entry.options.get(
+        CONF_TIMEOUT,
+        entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT),
+    )
+    minimum_confidence = entry.options.get(
+        CONF_MIN_CONFIDENCE,
+        entry.data.get(CONF_MIN_CONFIDENCE, DEFAULT_MIN_CONFIDENCE),
+    )
 
     client = NeedleClient(
         async_get_clientsession(hass),
         base_url,
-        entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT),
+        timeout,
     )
 
     api = NeedleAPI(
         hass,
-        api_id=api_id_for_url(base_url),
+        api_id=api_id_for_url(identity_url),
         name=api_name_for_url(base_url),
         client=client,
-        minimum_confidence=entry.data.get(
-            CONF_MIN_CONFIDENCE,
-            DEFAULT_MIN_CONFIDENCE,
-        ),
+        minimum_confidence=minimum_confidence,
     )
 
     unregister = register_api_compat(hass, api)
+    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "client": client,
@@ -68,3 +75,11 @@ async def async_unload_entry(
         hass.data.pop(DOMAIN, None)
 
     return True
+
+
+async def _async_reload_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+) -> None:
+    """Reload Needle LLM after configuration options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
