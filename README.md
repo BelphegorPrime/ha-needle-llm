@@ -72,9 +72,15 @@ therefore become available without adding a new hard-coded mapping here.
   - `POST /reset`
   - `POST /complete`
 
-For Home Assistant OS / Supervised installations you can use the Needle add-on:
+For Home Assistant OS / Supervised installations, you can run the local Needle
+server using the companion
+[Needle Home Assistant add-on](https://github.com/BelphegorPrime/ha-addon-collection/tree/master/addon-needle).
 
-https://github.com/BelphegorPrime/ha-addon-collection/tree/master/addon-needle
+The **add-on** hosts the Needle inference server; **this custom integration**
+exposes Needle to compatible Home Assistant conversation agents as an Assist
+LLM API. Install both when you want to use the add-on for LLM tool routing.
+See the [add-on setup guide](https://github.com/BelphegorPrime/ha-addon-collection/blob/master/addon-needle/DOCS.md)
+for its installation and network configuration.
 
 ## Installation with HACS
 
