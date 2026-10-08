@@ -1,10 +1,6 @@
 """Tests for dynamic Needle tool narrowing."""
 
-from custom_components.needle_llm.routing import (
-    build_discovery_tools,
-    candidate_tool_names,
-    execution_tool,
-)
+from custom_components.needle_llm import routing
 
 
 TOOLS = [
@@ -31,7 +27,7 @@ TOOLS = [
 
 def test_discovery_tools_remove_large_parameter_schemas() -> None:
     """Discovery keeps semantics but strips argument schemas."""
-    discovery = build_discovery_tools(TOOLS)
+    discovery = routing.build_discovery_tools(TOOLS)
 
     assert discovery[0]["name"] == "intent__HassTurnOff"
     assert discovery[0]["description"].startswith("Turn off.")
@@ -53,7 +49,7 @@ def test_suppressed_discovery_call_can_be_shortlist_hint() -> None:
         ],
     }
 
-    candidates = candidate_tool_names(
+    candidates = routing.candidate_tool_names(
         result,
         {tool["name"] for tool in TOOLS},
     )
@@ -74,7 +70,7 @@ def test_discovery_candidates_are_limited_and_deduplicated() -> None:
         ],
     }
 
-    candidates = candidate_tool_names(
+    candidates = routing.candidate_tool_names(
         result,
         {tool["name"] for tool in TOOLS},
         limit=2,
@@ -88,7 +84,7 @@ def test_discovery_candidates_are_limited_and_deduplicated() -> None:
 
 def test_execution_tool_restores_full_schema() -> None:
     """Stage two receives the exact full schema for shortlisted tools."""
-    execution = execution_tool(TOOLS[0])
+    execution = routing.execution_tool(TOOLS[0])
 
     assert execution == {
         "name": "intent__HassTurnOff",

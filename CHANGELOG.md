@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 - 2026-10-08
+
+- Fix Ruff import ordering in the dynamic narrowing tests so the complete CI
+  matrix can validate the 0.2.x routing implementation.
+
+
 ## 0.2.0 - 2026-10-08
 
 - Add dynamic two-stage Needle tool narrowing.
