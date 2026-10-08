@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1 - 2026-10-08
+
+- Remove the redundant per-request `POST /reset` request.
+- Rely on Needle playground's `/complete` behavior, which resets the current
+  agent when schemas are unchanged and creates a fresh agent when they change.
+- Keep serialized `/complete` calls to avoid concurrent state interleaving.
+- Remove the obsolete reset option from new configuration flows.
+
+
 ## 0.1.0 - 2026-10-08
 
 Initial release.
