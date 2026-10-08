@@ -1,4 +1,4 @@
-"""Config and options flow for Needle and llama.cpp routing."""
+"""Config and options flow for Needle and OpenAI-compatible routing."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .client import NeedleClient, NeedleClientError
 from .const import (
-    BACKEND_LLAMA_CPP,
+    BACKEND_OPENAI_COMPATIBLE,
     BACKEND_NEEDLE,
     CONF_BACKEND,
     CONF_MIN_CONFIDENCE,
@@ -22,8 +22,9 @@ from .const import (
     DEFAULT_MIN_CONFIDENCE,
     DEFAULT_TIMEOUT,
     DOMAIN,
+    normalize_backend,
 )
-from .llama_client import LlamaCppClient, LlamaCppClientError
+from .openai_client import OpenAICompatibleClient, OpenAICompatibleClientError
 
 
 def _normalize_url(value: str) -> str:
@@ -35,7 +36,7 @@ def _entry_title(base_url: str, backend: str) -> str:
     """Create a readable backend title."""
     parsed = urlparse(base_url)
     location = parsed.netloc or base_url
-    label = "llama.cpp" if backend == BACKEND_LLAMA_CPP else "Needle"
+    label = "OpenAI-compatible" if backend == BACKEND_OPENAI_COMPATIBLE else "Needle"
     return f"{label} @ {location}"
 
 
@@ -55,7 +56,7 @@ def _schema(
     return vol.Schema(
         {
             vol.Required(CONF_BACKEND, default=backend): vol.In(
-                [BACKEND_NEEDLE, BACKEND_LLAMA_CPP]
+                [BACKEND_NEEDLE, BACKEND_OPENAI_COMPATIBLE]
             ),
             url_marker: str,
             vol.Optional(CONF_MODEL, default=model): str,
@@ -80,8 +81,8 @@ async def _async_validate_connection(
     if not base_url.startswith(("http://", "https://")):
         return "invalid_url"
 
-    if backend == BACKEND_LLAMA_CPP:
-        client = LlamaCppClient(
+    if backend == BACKEND_OPENAI_COMPATIBLE:
+        client = OpenAICompatibleClient(
             async_get_clientsession(hass), base_url, request_timeout, model
         )
     else:
@@ -91,7 +92,7 @@ async def _async_validate_connection(
 
     try:
         model_info = await client.async_get_model()
-    except (NeedleClientError, LlamaCppClientError):
+    except (NeedleClientError, OpenAICompatibleClientError):
         return "cannot_connect"
 
     if not isinstance(model_info.get("name"), str) or not model_info["name"]:
@@ -101,7 +102,7 @@ async def _async_validate_connection(
 
 
 class NeedleLLMConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Create Needle or llama.cpp integration entries."""
+    """Create Needle or OpenAI-compatible integration entries."""
 
     VERSION = 1
 
@@ -121,7 +122,7 @@ class NeedleLLMConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             base_url = _normalize_url(user_input[CONF_URL])
-            backend = user_input.get(CONF_BACKEND, DEFAULT_BACKEND)
+            backend = normalize_backend(user_input.get(CONF_BACKEND, DEFAULT_BACKEND))
             model = user_input.get(CONF_MODEL, "")
             request_timeout = user_input[CONF_TIMEOUT]
             error = await _async_validate_connection(
@@ -168,8 +169,8 @@ class NeedleLLMOptionsFlow(config_entries.OptionsFlowWithConfigEntry):
         saved = self.config_entry.data
         options = self.config_entry.options
 
-        current_backend = options.get(
-            CONF_BACKEND, saved.get(CONF_BACKEND, DEFAULT_BACKEND)
+        current_backend = normalize_backend(
+            options.get(CONF_BACKEND, saved.get(CONF_BACKEND, DEFAULT_BACKEND))
         )
         current_url = options.get(CONF_URL, saved[CONF_URL])
         current_model = options.get(CONF_MODEL, saved.get(CONF_MODEL, ""))
@@ -183,7 +184,7 @@ class NeedleLLMOptionsFlow(config_entries.OptionsFlowWithConfigEntry):
 
         if user_input is not None:
             base_url = _normalize_url(user_input[CONF_URL])
-            backend = user_input.get(CONF_BACKEND, DEFAULT_BACKEND)
+            backend = normalize_backend(user_input.get(CONF_BACKEND, DEFAULT_BACKEND))
             model = user_input.get(CONF_MODEL, "")
             request_timeout = user_input[CONF_TIMEOUT]
 

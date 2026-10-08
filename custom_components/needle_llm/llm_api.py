@@ -22,12 +22,12 @@ from .compat import (
     schema_to_json_schema,
 )
 from .const import (
-    BACKEND_LLAMA_CPP,
+    BACKEND_OPENAI_COMPATIBLE,
     BACKEND_NEEDLE,
     DEFAULT_BACKEND,
     DOMAIN,
 )
-from .llama_client import LlamaCppClient, LlamaCppClientError
+from .openai_client import OpenAICompatibleClient, OpenAICompatibleClientError
 from .routing import (
     build_discovery_tools,
     build_routing_query,
@@ -41,7 +41,7 @@ from .target_guard import (
 )
 from .validation import (
     RouteRejected,
-    approve_llama_route,
+    approve_openai_route,
     approve_route,
 )
 
@@ -64,7 +64,7 @@ class NeedleRouteTool(llm.Tool):
 
     def __init__(
         self,
-        client: NeedleClient | LlamaCppClient,
+        client: NeedleClient | OpenAICompatibleClient,
         *,
         backend: str,
         minimum_confidence: float,
@@ -137,15 +137,15 @@ class NeedleRouteTool(llm.Tool):
             "skipped_tools": skipped_tools,
         }
 
-        if self._backend == BACKEND_LLAMA_CPP:
-            diagnostics["routing_strategy"] = "llama_cpp_openai_single_pass"
+        if self._backend == BACKEND_OPENAI_COMPATIBLE:
+            diagnostics["routing_strategy"] = "openai_compatible_single_pass"
             try:
                 result, transport = await self._client.async_complete(
                     tools=needle_tools,
                     query=query,
                     language=llm_context.language,
                 )
-            except LlamaCppClientError as err:
+            except OpenAICompatibleClientError as err:
                 return _error(
                     str(err),
                     stage=err.stage,
@@ -173,7 +173,7 @@ class NeedleRouteTool(llm.Tool):
             }
 
             try:
-                route = approve_llama_route(
+                route = approve_openai_route(
                     result,
                     allowed_tools=allowed_tools,
                 )
@@ -185,7 +185,7 @@ class NeedleRouteTool(llm.Tool):
                         "stage": "validation",
                         "device_lookup_attempted": False,
                         "guidance": (
-                            "llama.cpp did not produce an approved tool call. "
+                            "OpenAI-compatible did not produce an approved tool call. "
                             "No Home Assistant action or device lookup ran."
                         ),
                         "diagnostics": diagnostics,
@@ -343,7 +343,7 @@ class NeedleRouteTool(llm.Tool):
         target_tool = tools_by_name.get(route.tool)
         if target_tool is None:
             return _error(
-                "Needle selected a tool that is no longer available",
+                "The model selected a tool that is no longer available",
                 stage="tool_lookup",
                 diagnostics=diagnostics,
             )
@@ -360,7 +360,7 @@ class NeedleRouteTool(llm.Tool):
                 != " ".join(intended_name.casefold().split())
             ):
                 return _error(
-                    "Needle's target name differs from the uniquely matched "
+                    "The model's target name differs from the uniquely matched "
                     "exposed entity; no action was executed",
                     stage="target_validation",
                     diagnostics={
@@ -376,7 +376,7 @@ class NeedleRouteTool(llm.Tool):
                 domains = value if isinstance(value, list) else [value]
                 if domains != [actual_domain]:
                     return _error(
-                        "Needle's domain conflicts with the named exposed entity",
+                        "The model's domain conflicts with the named exposed entity",
                         stage="target_validation",
                         diagnostics={
                             **diagnostics,
@@ -417,7 +417,7 @@ class NeedleRouteTool(llm.Tool):
                 )
             except TargetGuardRejected as err:
                 return _error(
-                    f"Needle's entity filters are contradictory: {err}",
+                    f"The model's entity filters are contradictory: {err}",
                     stage="target_validation",
                     diagnostics={
                         **diagnostics,
@@ -431,7 +431,7 @@ class NeedleRouteTool(llm.Tool):
             target_tool.parameters(arguments)
         except Exception as err:  # noqa: BLE001
             return _error(
-                f"Home Assistant rejected Needle arguments: {err}",
+                f"Home Assistant rejected routed arguments: {err}",
                 stage="argument_validation",
                 diagnostics={
                     **diagnostics,
@@ -489,7 +489,11 @@ class NeedleRouteTool(llm.Tool):
                     **diagnostics,
                     "stage": "completed",
                     "narrowed_from": len(needle_tools),
-                    "narrowed_to": len(candidates),
+                    "narrowed_to": (
+                        len(candidates)
+                        if self._backend == BACKEND_NEEDLE
+                        else len(needle_tools)
+                    ),
                     "selected_tool": route.tool,
                     "selected_arguments": arguments,
                     "backend": self._backend,
@@ -508,11 +512,11 @@ if hasattr(llm, "ToolAnnotations"):
     )
 
 
-class LlamaRouteTool(NeedleRouteTool):
-    """Tool exposing the llama.cpp backend without a misleading Needle name."""
+class OpenAICompatibleRouteTool(NeedleRouteTool):
+    """Route native Assist tools through an OpenAI-compatible model API."""
 
-    name = "LlamaRoute"
-    title = "Route Home Assistant request through llama.cpp"
+    name = "OpenAICompatibleRoute"
+    title = "Route Home Assistant request through an OpenAI-compatible model"
 
 
 class NeedleAPI(llm.API):
@@ -524,7 +528,7 @@ class NeedleAPI(llm.API):
         *,
         api_id: str,
         name: str,
-        client: NeedleClient | LlamaCppClient,
+        client: NeedleClient | OpenAICompatibleClient,
         backend: str,
         minimum_confidence: float,
     ) -> None:
@@ -540,7 +544,7 @@ class NeedleAPI(llm.API):
     ) -> llm.APIInstance:
         """Return the API instance for one conversation request."""
         tool_cls = (
-            LlamaRouteTool if self._backend == BACKEND_LLAMA_CPP
+            OpenAICompatibleRouteTool if self._backend == BACKEND_OPENAI_COMPATIBLE
             else NeedleRouteTool
         )
         tool_name = tool_cls.name
@@ -579,7 +583,7 @@ def api_name_for_url(
     """Return a stable human-readable API name."""
     parsed = urlparse(base_url)
     location = parsed.netloc or base_url
-    label = "llama.cpp" if backend == BACKEND_LLAMA_CPP else "Needle LLM"
+    label = "OpenAI-compatible" if backend == BACKEND_OPENAI_COMPATIBLE else "Needle LLM"
     return f"{label} @ {location}"
 
 

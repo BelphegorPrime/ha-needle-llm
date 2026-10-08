@@ -1,13 +1,13 @@
-"""Unit tests for the llama.cpp routing backend."""
+"""Unit tests for the OpenAI-compatible routing backend."""
 
 import json
 
 import pytest
 
-from custom_components.needle_llm.llama_client import openai_tools
+from custom_components.needle_llm.openai_client import openai_tools
 from custom_components.needle_llm.validation import (
     RouteRejected,
-    approve_llama_route,
+    approve_openai_route,
 )
 
 
@@ -51,7 +51,7 @@ def test_tool_schema_mapping() -> None:
 
 def test_approve_single_native_tool_call() -> None:
     """An allowed tool is parsed without fabricating model confidence."""
-    result = approve_llama_route(
+    result = approve_openai_route(
         _response(), allowed_tools={"intent__HassTurnOff"}
     )
     assert result.tool == "intent__HassTurnOff"
@@ -80,7 +80,7 @@ def test_approve_single_native_tool_call() -> None:
 def test_fail_closed_on_invalid_model_output(body: dict, reason: str) -> None:
     """Do not execute hallucinated, truncated, or malformed calls."""
     with pytest.raises(RouteRejected, match=reason):
-        approve_llama_route(body, allowed_tools={"intent__HassTurnOff"})
+        approve_openai_route(body, allowed_tools={"intent__HassTurnOff"})
 
 
 def test_fail_closed_on_multiple_calls() -> None:
@@ -89,6 +89,6 @@ def test_fail_closed_on_multiple_calls() -> None:
     calls = response["choices"][0]["message"]["tool_calls"]
     calls.append(calls[0].copy())
     with pytest.raises(RouteRejected, match="exactly one tool call"):
-        approve_llama_route(
+        approve_openai_route(
             response, allowed_tools={"intent__HassTurnOff"}
         )

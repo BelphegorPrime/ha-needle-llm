@@ -1,4 +1,4 @@
-"""Validation helpers for Needle and llama.cpp routing results."""
+"""Validation helpers for Needle and OpenAI-compatible routing results."""
 
 from __future__ import annotations
 
@@ -65,42 +65,42 @@ def approve_route(
     return ApprovedRoute(tool=tool, arguments=arguments, confidence=confidence)
 
 
-def approve_llama_route(
+def approve_openai_route(
     result: dict[str, Any],
     *,
     allowed_tools: Collection[str],
 ) -> ApprovedRoute:
-    """Reject anything except exactly one valid llama.cpp function call.
+    """Reject anything except exactly one valid OpenAI-compatible function call.
 
     The OpenAI interface does not return a Needle-style calibrated confidence.
     """
     choices = result.get("choices")
     if not isinstance(choices, list) or len(choices) != 1:
-        raise RouteRejected("llama.cpp did not return exactly one choice")
+        raise RouteRejected("OpenAI-compatible did not return exactly one choice")
     choice = choices[0]
     if not isinstance(choice, dict) or choice.get("finish_reason") == "length":
-        raise RouteRejected("llama.cpp returned an incomplete choice")
+        raise RouteRejected("OpenAI-compatible returned an incomplete choice")
     message = choice.get("message")
     if not isinstance(message, dict):
-        raise RouteRejected("llama.cpp returned no assistant message")
+        raise RouteRejected("OpenAI-compatible returned no assistant message")
     calls = message.get("tool_calls")
     if not isinstance(calls, list) or len(calls) != 1:
-        raise RouteRejected("llama.cpp did not return exactly one tool call")
+        raise RouteRejected("OpenAI-compatible did not return exactly one tool call")
     call = calls[0]
     if not isinstance(call, dict) or call.get("type") != "function":
-        raise RouteRejected("llama.cpp returned a non-function tool call")
+        raise RouteRejected("OpenAI-compatible returned a non-function tool call")
     function = call.get("function")
     if not isinstance(function, dict):
-        raise RouteRejected("llama.cpp returned an invalid function")
+        raise RouteRejected("OpenAI-compatible returned an invalid function")
     name = function.get("name")
     if not isinstance(name, str) or name not in allowed_tools:
-        raise RouteRejected(f"llama.cpp selected an unavailable tool: {name}")
+        raise RouteRejected(f"OpenAI-compatible selected an unavailable tool: {name}")
     args = function.get("arguments")
     if isinstance(args, str):
         try:
             args = json.loads(args)
         except (ValueError, TypeError) as err:
-            raise RouteRejected("llama.cpp returned malformed argument JSON") from err
+            raise RouteRejected("OpenAI-compatible returned malformed argument JSON") from err
     if not isinstance(args, dict):
-        raise RouteRejected("llama.cpp arguments must be a JSON object")
+        raise RouteRejected("OpenAI-compatible arguments must be a JSON object")
     return ApprovedRoute(tool=name, arguments=args, confidence=None)

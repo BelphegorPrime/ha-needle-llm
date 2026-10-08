@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.3.0
+0.3.1
 ```
 
 ## License
@@ -357,7 +357,7 @@ used unchanged; low-confidence and suppressed Needle calls are never executed.
 ## Optional llama.cpp GPU tool router (experimental)
 
 The integration supports two alternative tool-routing backends:
-**Needle** (existing default) and **llama.cpp**, using its OpenAI-compatible
+**Needle** (existing default) and **OpenAI-compatible API**, using its OpenAI-compatible
 `/v1/chat/completions` function-calling API. All existing Needle configurations
 continue using Needle unless you explicitly change the backend.
 
@@ -367,25 +367,42 @@ To test llama.cpp:
    Enable GPU offloading and a Jinja tool-call-capable chat template
    (on versions where `--jinja` is already the default, no extra flag is needed).
 2. In Home Assistant, open **Settings -> Devices & services -> Needle LLM ->
-   Configure** and choose backend `llama_cpp`. Set **Server URL** to the
+   Configure** and choose backend `openai_compatible`. Set **Server URL** to the
    hostname and port reachable *from Home Assistant Core*, for example
    `http://192.168.1.50:50033` (not the `/v1/chat/completions` path).
    Leave the optional **Model ID** empty to select the first `/v1/models` ID,
    or explicitly enter the alias configured in llama-server.
 3. Save the configuration. In your conversation agent select the available
-   **LlamaRoute** tool/API and test a simple, harmless command.
+   **OpenAICompatibleRoute** tool/API and test a simple, harmless command.
 
-The llama.cpp backend performs **one** OpenAI tool-routing call with the
+The OpenAI-compatible backend performs **one** OpenAI tool-routing call with the
 currently available native HA Assist tools. It does not call Needle, does not
 require `/reset`, and does not send user requests to an external cloud.
 The model must return exactly one allowed tool call and valid JSON-object
 arguments. Existing native HA parameter validation, exposure controls and
 target guards continue to apply before execution.
 
-**Confidence:** llama.cpp's OpenAI tool-call response does not provide a
+**Confidence:** the OpenAI-compatible server's OpenAI tool-call response does not provide a
 calibrated Needle confidence number. The configurable minimum-confidence
 threshold therefore applies only to Needle. No synthetic confidence of 1.0
 is assigned to llama.cpp results.
 
 Do not expose unauthenticated llama.cpp endpoints to the public Internet.
 This prototype expects a local/trusted network server without an API key.
+
+
+### Reuse of other Home Assistant LLM integrations
+
+This adapter talks to an OpenAI-compatible HTTP inference **endpoint**, not
+to a second Home Assistant Conversation agent. llama.cpp, vLLM, Ollama and
+other servers may implement this interface; API compatibility for tool calls
+must be verified per server/model. A Home Assistant conversation-agent
+integration does not expose a universal raw model-tool-call interface.
+Forwarding to its `conversation.process` workflow would usually execute tools
+inside that agent before this integration could apply its own safety checks,
+and may recurse if the agent references this same router.
+
+Existing `llama_cpp` backend settings from the first prototype are mapped
+to `openai_compatible` for backwards compatibility. This experimental adapter
+currently expects a trusted OpenAI-compatible endpoint not requiring bearer
+authentication.

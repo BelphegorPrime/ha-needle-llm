@@ -1,10 +1,10 @@
 {
-  "title": "Needle / llama.cpp Tool Router",
+  "title": "Needle / OpenAI-kompatibler Tool-Router",
   "config": {
     "step": {
       "user": {
         "title": "Mit einem Tool-Router verbinden",
-        "description": "Mit Needle oder einem lokalen llama.cpp-Server verbinden.",
+        "description": "Needle oder einen OpenAI-kompatiblen Modellserver einrichten.",
         "data": {
           "backend": "Routing-Backend",
           "url": "Server-URL",
@@ -13,17 +13,17 @@
           "model": "Modell-ID (optional)"
         },
         "data_description": {
-          "backend": "Needle oder llama.cpp auswählen.",
-          "url": "Basis-URL, z. B. http://192.168.1.50:7860 (Needle) oder http://192.168.1.50:8080 (llama.cpp).",
-          "min_confidence": "Nur für Needle. llama.cpp liefert keine vergleichbare kalibrierte Confidence.",
-          "timeout": "HTTP-Timeout pro Anfrage, bis 600 Sekunden.",
-          "model": "Für llama.cpp: Leer lassen für das erste Modell aus /v1/models."
+          "backend": "Needle oder einen OpenAI-kompatiblen API-Endpunkt auswählen.",
+          "url": "Basis-URL des Modellservers, zum Beispiel http://192.168.1.50:8080.",
+          "min_confidence": "Nur für Needle. OpenAI-kompatible Tool-Calls enthalten keine kalibrierte Confidence.",
+          "timeout": "HTTP-Timeout pro Anfrage, bis zu 600 Sekunden.",
+          "model": "Für OpenAI-kompatible APIs: Leer lassen, um das erste Modell unter /v1/models zu verwenden."
         }
       }
     },
     "error": {
-      "cannot_connect": "Server nicht erreichbar oder Modell-Endpunkt nicht verfügbar.",
-      "invalid_response": "Ungültige Antwort des Modell-Endpunkts.",
+      "cannot_connect": "Modellserver nicht erreichbar oder Modell-Endpunkt nicht verfügbar.",
+      "invalid_response": "Ungültige Modell-Endpunkt-Antwort.",
       "invalid_url": "Bitte eine http://- oder https://-URL eingeben."
     },
     "abort": {
@@ -34,7 +34,7 @@
     "step": {
       "init": {
         "title": "Tool-Router konfigurieren",
-        "description": "Routing-Backend und Server-Verbindung ändern.",
+        "description": "Routing-Backend und Serververbindung ändern.",
         "data": {
           "backend": "Routing-Backend",
           "url": "Server-URL",
@@ -43,17 +43,17 @@
           "model": "Modell-ID (optional)"
         },
         "data_description": {
-          "backend": "Needle oder llama.cpp auswählen.",
-          "url": "Basis-URL, z. B. http://192.168.1.50:7860 (Needle) oder http://192.168.1.50:8080 (llama.cpp).",
-          "min_confidence": "Nur für Needle. llama.cpp liefert keine vergleichbare kalibrierte Confidence.",
-          "timeout": "HTTP-Timeout pro Anfrage, bis 600 Sekunden.",
-          "model": "Für llama.cpp: Leer lassen für das erste Modell aus /v1/models."
+          "backend": "Needle oder einen OpenAI-kompatiblen API-Endpunkt auswählen.",
+          "url": "Basis-URL des Modellservers, zum Beispiel http://192.168.1.50:8080.",
+          "min_confidence": "Nur für Needle. OpenAI-kompatible Tool-Calls enthalten keine kalibrierte Confidence.",
+          "timeout": "HTTP-Timeout pro Anfrage, bis zu 600 Sekunden.",
+          "model": "Für OpenAI-kompatible APIs: Leer lassen, um das erste Modell unter /v1/models zu verwenden."
         }
       }
     },
     "error": {
-      "cannot_connect": "Server nicht erreichbar oder Modell-Endpunkt nicht verfügbar.",
-      "invalid_response": "Ungültige Antwort des Modell-Endpunkts.",
+      "cannot_connect": "Modellserver nicht erreichbar oder Modell-Endpunkt nicht verfügbar.",
+      "invalid_response": "Ungültige Modell-Endpunkt-Antwort.",
       "invalid_url": "Bitte eine http://- oder https://-URL eingeben."
     }
   }

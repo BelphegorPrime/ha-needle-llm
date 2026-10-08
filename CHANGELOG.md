@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.1 - 2026-10-08
+
+- Rename the generic OpenAI-compatible backend, client, route tool, validation
+  and test modules to avoid implying a dependency on llama.cpp.
+- Preserve compatibility with the initial `llama_cpp` backend setting.
+- Fix successful OpenAI-compatible tool execution diagnostics when no Needle
+  discovery shortlist exists.
+- Clarify that this API adapter targets an OpenAI-compatible inference HTTP
+  endpoint; invoking arbitrary Home Assistant Conversation agents would
+  bypass the intended pre-execution validation.
+
+
 ## 0.3.0 - 2026-10-08
 
 - Add optional llama.cpp routing backend using OpenAI tool calling.

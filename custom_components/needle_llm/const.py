@@ -3,7 +3,8 @@
 DOMAIN = "needle_llm"
 
 BACKEND_NEEDLE = "needle"
-BACKEND_LLAMA_CPP = "llama_cpp"
+BACKEND_OPENAI_COMPATIBLE = "openai_compatible"
+LEGACY_BACKEND_LLAMA_CPP = "llama_cpp"
 DEFAULT_BACKEND = BACKEND_NEEDLE
 
 CONF_BACKEND = "backend"
@@ -13,3 +14,9 @@ CONF_TIMEOUT = "timeout"
 
 DEFAULT_MIN_CONFIDENCE = 0.80
 DEFAULT_TIMEOUT = 30
+
+def normalize_backend(backend: str) -> str:
+    """Migrate the initial llama.cpp-specific name to the generic backend."""
+    if backend == LEGACY_BACKEND_LLAMA_CPP:
+        return BACKEND_OPENAI_COMPATIBLE
+    return backend

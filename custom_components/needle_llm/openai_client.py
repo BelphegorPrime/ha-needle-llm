@@ -1,4 +1,4 @@
-"""OpenAI-compatible llama.cpp HTTP client for Home Assistant tool routing."""
+"""OpenAI-compatible OpenAI-compatible HTTP client for Home Assistant tool routing."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ import aiohttp
 
 
 @dataclass(slots=True)
-class LlamaCppClientError(Exception):
-    """Structured llama.cpp transport error."""
+class OpenAICompatibleClientError(Exception):
+    """Structured OpenAI-compatible transport error."""
 
     stage: str
     path: str
@@ -23,7 +23,7 @@ class LlamaCppClientError(Exception):
 
     def __str__(self) -> str:
         """Describe the error without leaking request headers."""
-        return f"llama.cpp {self.stage} failed: {self.message or self.error_type}"
+        return f"OpenAI-compatible {self.stage} failed: {self.message or self.error_type}"
 
     def as_dict(self) -> dict[str, Any]:
         """Export transport diagnostics."""
@@ -57,7 +57,7 @@ def openai_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-class LlamaCppClient:
+class OpenAICompatibleClient:
     """One-shot tool routing; no persistent conversation or device actions."""
 
     def __init__(
@@ -80,12 +80,12 @@ class LlamaCppClient:
         data = await self._request("GET", "/v1/models", stage="model")
         entries = data.get("data")
         if not isinstance(entries, list) or not entries:
-            raise LlamaCppClientError(
+            raise OpenAICompatibleClientError(
                 "model", "/v1/models", "InvalidResponse", "No models advertised"
             )
         first = entries[0]
         if not isinstance(first, dict) or not isinstance(first.get("id"), str):
-            raise LlamaCppClientError(
+            raise OpenAICompatibleClientError(
                 "model", "/v1/models", "InvalidResponse", "Missing model ID"
             )
         return {"name": self._model or first["id"]}
@@ -154,7 +154,7 @@ class LlamaCppClient:
                 raw = await response.text()
                 elapsed_ms = (time.monotonic() - started) * 1000
                 if response.status >= 400:
-                    raise LlamaCppClientError(
+                    raise OpenAICompatibleClientError(
                         stage, path, "HTTPError",
                         f"Server returned HTTP {response.status}",
                         status=response.status,
@@ -164,24 +164,24 @@ class LlamaCppClient:
                 try:
                     data = await response.json()
                 except (aiohttp.ContentTypeError, ValueError) as err:
-                    raise LlamaCppClientError(
+                    raise OpenAICompatibleClientError(
                         stage, path, type(err).__name__,
                         "Response was not valid JSON",
                         status=response.status,
                         response_body=raw[:1000] or None,
                         elapsed_ms=elapsed_ms,
                     ) from err
-        except LlamaCppClientError:
+        except OpenAICompatibleClientError:
             raise
         except (aiohttp.ClientError, TimeoutError) as err:
-            raise LlamaCppClientError(
+            raise OpenAICompatibleClientError(
                 stage, path, type(err).__name__,
                 str(err) or type(err).__name__,
                 elapsed_ms=(time.monotonic() - started) * 1000,
             ) from err
 
         if not isinstance(data, dict):
-            raise LlamaCppClientError(
+            raise OpenAICompatibleClientError(
                 stage, path, "InvalidResponse", "Expected a JSON object"
             )
         return data

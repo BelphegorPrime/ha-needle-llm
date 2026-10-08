@@ -1,4 +1,4 @@
-"""Needle / llama.cpp tool router integration."""
+"""Needle / OpenAI-compatible tool router integration."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .client import NeedleClient
 from .compat import register_api_compat
 from .const import (
-    BACKEND_LLAMA_CPP,
+    BACKEND_OPENAI_COMPATIBLE,
     CONF_BACKEND,
     CONF_MIN_CONFIDENCE,
     CONF_MODEL,
@@ -19,8 +19,9 @@ from .const import (
     DEFAULT_MIN_CONFIDENCE,
     DEFAULT_TIMEOUT,
     DOMAIN,
+    normalize_backend,
 )
-from .llama_client import LlamaCppClient
+from .openai_client import OpenAICompatibleClient
 from .llm_api import NeedleAPI, api_id_for_url, api_name_for_url
 
 
@@ -31,8 +32,10 @@ async def async_setup_entry(
     """Register the routing API for the configured backend."""
     identity_url = entry.data[CONF_URL]
     base_url = entry.options.get(CONF_URL, identity_url)
-    backend = entry.options.get(
-        CONF_BACKEND, entry.data.get(CONF_BACKEND, DEFAULT_BACKEND)
+    backend = normalize_backend(
+        entry.options.get(
+            CONF_BACKEND, entry.data.get(CONF_BACKEND, DEFAULT_BACKEND)
+        )
     )
     model = entry.options.get(CONF_MODEL, entry.data.get(CONF_MODEL, ""))
     request_timeout = entry.options.get(
@@ -44,8 +47,8 @@ async def async_setup_entry(
         entry.data.get(CONF_MIN_CONFIDENCE, DEFAULT_MIN_CONFIDENCE),
     )
 
-    if backend == BACKEND_LLAMA_CPP:
-        client = LlamaCppClient(
+    if backend == BACKEND_OPENAI_COMPATIBLE:
+        client = OpenAICompatibleClient(
             async_get_clientsession(hass), base_url, request_timeout, model
         )
     else:
