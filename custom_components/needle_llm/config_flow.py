@@ -67,7 +67,7 @@ def _schema(
 async def _async_validate_connection(
     hass,
     base_url: str,
-    timeout: int,
+    request_timeout: int,
 ) -> str | None:
     """Validate a Needle server and return an error key on failure."""
     if not (
@@ -79,7 +79,7 @@ async def _async_validate_connection(
     client = NeedleClient(
         async_get_clientsession(hass),
         base_url,
-        timeout,
+        request_timeout,
     )
 
     try:
