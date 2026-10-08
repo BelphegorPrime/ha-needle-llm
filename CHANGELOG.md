@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 - 2026-10-08
+
+- Make the registered Home Assistant LLM API ID deterministic from the Needle URL.
+- Recreating a Needle LLM config entry with the same URL no longer changes the
+  API ID and therefore no longer breaks conversation integrations that reference it.
+
+
 ## 0.1.1 - 2026-10-08
 
 - Remove the redundant per-request `POST /reset` request.

@@ -16,7 +16,7 @@ from .const import (
     DEFAULT_TIMEOUT,
     DOMAIN,
 )
-from .llm_api import NeedleAPI, api_name_for_url
+from .llm_api import NeedleAPI, api_id_for_url, api_name_for_url
 
 
 async def async_setup_entry(
@@ -34,7 +34,7 @@ async def async_setup_entry(
 
     api = NeedleAPI(
         hass,
-        api_id=f"{DOMAIN}_{entry.entry_id}",
+        api_id=api_id_for_url(base_url),
         name=api_name_for_url(base_url),
         client=client,
         minimum_confidence=entry.data.get(

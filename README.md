@@ -25,7 +25,7 @@ authorization and execution boundary.
 
 - UI configuration through **Settings -> Devices & services**
 - Connects to a local Needle server and validates it with `GET /model`
-- Registers a selectable Home Assistant LLM API
+- Registers a selectable Home Assistant LLM API with a stable ID derived from the Needle URL
 - Exposes one `NeedleRoute(query)` tool to the conversation model
 - Dynamically mirrors the tools provided by Home Assistant's native **Assist**
   LLM API
@@ -269,7 +269,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.1.1
+0.1.2
 ```
 
 ## License

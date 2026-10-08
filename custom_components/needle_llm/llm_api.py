@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any
 from urllib.parse import urlparse
@@ -205,6 +206,12 @@ class NeedleAPI(llm.API):
                 )
             ],
         )
+
+
+def api_id_for_url(base_url: str) -> str:
+    """Return a deterministic API ID for a configured Needle server."""
+    digest = hashlib.sha256(base_url.encode("utf-8")).hexdigest()[:16]
+    return f"{DOMAIN}_{digest}"
 
 
 def api_name_for_url(base_url: str) -> str:
