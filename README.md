@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.3.1
+0.4.0
 ```
 
 ## License
@@ -406,3 +406,66 @@ Existing `llama_cpp` backend settings from the first prototype are mapped
 to `openai_compatible` for backwards compatibility. This experimental adapter
 currently expects a trusted OpenAI-compatible endpoint not requiring bearer
 authentication.
+
+
+## Existing Home Assistant model integration + Needle approval (v0.4.0)
+
+The **HA model provider** mode reuses a previously configured Home Assistant
+conversation model instead of asking for another API URL, model name or key.
+
+**Current provider adapter:** Home Assistant's built-in `llama_cpp` integration
+(HA 2026.10); other integrations require separately tested adapters. The
+selected loaded config entry exposes an existing `AsyncOpenAI` client, and the
+selected conversation model is read from its HA config subentry. Only
+`entry_id:subentry_id` is stored in this integration. The model client is
+resolved anew for every turn, including after a normal reload of the
+upstream provider integration.
+
+### Configure
+
+1. Configure the built-in **llama.cpp** integration and a conversation model
+   in Home Assistant first.
+2. Install/update this integration, open **Settings → Devices & services →
+   Needle LLM** and configure a new entry (or an existing Needle entry).
+3. Select backend **`ha_provider`**, supply the existing **Needle server URL**
+   (Needle is still mandatory), choose **Existing Home Assistant model** from
+   the dropdown, and select one of:
+   - **`needle_preselection`**: Needle proposes the native Assist tool.
+   - **`model_preselection`**: the selected HA model proposes the tool.
+4. Set the **minimum Needle confidence** (default 0.8) and timeout, then save.
+   Choose the resulting **NeedleVerifiedRoute** LLM API in your conversation
+   agent and test a harmless device.
+
+The pipeline is:
+
+```text
+HA native Assist tool catalog
+  -> Needle or configured HA model: tool preselection (no execution)
+  -> Needle: independent action approval (confidence/grounding gate)
+  -> configured HA model: final arguments for ONLY the approved tool
+  -> HA schema validation + exposure/target checks
+  -> native Assist execution
+```
+
+The model's preliminary tool call is never executed. Needle's approval uses
+the full catalog of compact tool descriptions; it must independently choose
+the same native tool at/above the configured confidence threshold. An
+unavailable target, ambiguous tool, mismatched action, missing tool call,
+untrusted model output or validation failure results in **no action**. No
+language-specific mappings or fixed smart-home domain lists are used.
+
+The existing standalone Needle and direct OpenAI-compatible HTTP backends
+remain available for compatibility. Do not confuse the standalone
+OpenAI-compatible backend with `ha_provider`: the former bypasses Needle,
+whereas the latter always requires its explicit approval.
+
+**Compatibility:** Selecting an arbitrary HA conversation agent cannot
+guarantee safe tool proposal interception. The initial adapter deliberately
+supports only loaded `llama_cpp` config/subentries with the known
+`runtime_data` client interface. Future providers will have individually
+tested adapters instead of trying to invoke `conversation.process` and risk
+implicit tool execution or recursion.
+
+**Latency:** Both strategies still run a Needle approval pass. This is a
+correctness/safety-focused prototype, not yet proven faster than native HA
+tool calling. Benchmarking remains essential.

@@ -1,4 +1,4 @@
-"""Home Assistant LLM API backed by Needle."""
+"""Home Assistant Assist tool routing with optional HA model provider."""
 
 from __future__ import annotations
 
@@ -22,11 +22,18 @@ from .compat import (
     schema_to_json_schema,
 )
 from .const import (
+    BACKEND_HA_PROVIDER,
     BACKEND_NEEDLE,
     BACKEND_OPENAI_COMPATIBLE,
     DEFAULT_BACKEND,
     DOMAIN,
 )
+from .ha_pipeline import (
+    DEFAULT_STRATEGY,
+    PipelineRejected,
+    async_provider_route,
+)
+from .ha_provider import HomeAssistantModelProvider
 from .openai_client import OpenAICompatibleClient, OpenAICompatibleClientError
 from .routing import (
     build_discovery_tools,
@@ -68,11 +75,15 @@ class NeedleRouteTool(llm.Tool):
         *,
         backend: str,
         minimum_confidence: float,
+        provider: HomeAssistantModelProvider | None = None,
+        routing_strategy: str = DEFAULT_STRATEGY,
     ) -> None:
         """Initialize the routing tool."""
         self._client = client
         self._backend = backend
         self._minimum_confidence = minimum_confidence
+        self._provider = provider
+        self._routing_strategy = routing_strategy
 
     async def async_call(
         self,
@@ -137,7 +148,38 @@ class NeedleRouteTool(llm.Tool):
             "skipped_tools": skipped_tools,
         }
 
-        if self._backend == BACKEND_OPENAI_COMPATIBLE:
+        if self._backend == BACKEND_HA_PROVIDER:
+            if self._provider is None or not isinstance(
+                self._client, NeedleClient
+            ):
+                return _error(
+                    "The Needle model provider is not configured",
+                    stage="configuration",
+                    diagnostics=diagnostics,
+                )
+            try:
+                proposal = await async_provider_route(
+                    hass=hass,
+                    context=llm_context,
+                    query=query,
+                    tools=needle_tools,
+                    needle=self._client,
+                    provider=self._provider,
+                    strategy=self._routing_strategy,
+                    minimum_confidence=self._minimum_confidence,
+                    diagnostics=diagnostics,
+                )
+            except PipelineRejected as err:
+                return _error(
+                    err.reason,
+                    stage=err.stage,
+                    diagnostics=diagnostics,
+                )
+            route = proposal.route
+            candidates = [proposal.candidate]
+            matched_target = proposal.matched_target
+            removed_fields = proposal.removed_fields
+        elif self._backend == BACKEND_OPENAI_COMPATIBLE:
             diagnostics["routing_strategy"] = "openai_compatible_single_pass"
             try:
                 result, transport = await self._client.async_complete(
@@ -519,6 +561,13 @@ class OpenAICompatibleRouteTool(NeedleRouteTool):
     title = "Route Home Assistant request through an OpenAI-compatible model"
 
 
+class NeedleVerifiedRouteTool(NeedleRouteTool):
+    """Route through an existing HA model with compulsory Needle approval."""
+
+    name = "NeedleVerifiedRoute"
+    title = "Home Assistant model routing verified by Needle"
+
+
 class NeedleAPI(llm.API):
     """LLM API that exposes the Needle router."""
 
@@ -531,22 +580,33 @@ class NeedleAPI(llm.API):
         client: NeedleClient | OpenAICompatibleClient,
         backend: str,
         minimum_confidence: float,
+        provider_model: str = "",
+        routing_strategy: str = DEFAULT_STRATEGY,
+        timeout: int = 30,
     ) -> None:
         """Initialize the API."""
         super().__init__(hass=hass, id=api_id, name=name)
         self._client = client
         self._backend = backend
         self._minimum_confidence = minimum_confidence
+        self._routing_strategy = routing_strategy
+        self._provider = (
+            HomeAssistantModelProvider(hass, provider_model, timeout)
+            if backend == BACKEND_HA_PROVIDER
+            else None
+        )
 
     async def async_get_api_instance(
         self,
         llm_context: llm.LLMContext,
     ) -> llm.APIInstance:
         """Return the API instance for one conversation request."""
-        tool_cls = (
-            OpenAICompatibleRouteTool if self._backend == BACKEND_OPENAI_COMPATIBLE
-            else NeedleRouteTool
-        )
+        if self._backend == BACKEND_HA_PROVIDER:
+            tool_cls = NeedleVerifiedRouteTool
+        elif self._backend == BACKEND_OPENAI_COMPATIBLE:
+            tool_cls = OpenAICompatibleRouteTool
+        else:
+            tool_cls = NeedleRouteTool
         tool_name = tool_cls.name
         return llm.APIInstance(
             api=self,
@@ -566,6 +626,8 @@ class NeedleAPI(llm.API):
                     self._client,
                     backend=self._backend,
                     minimum_confidence=self._minimum_confidence,
+                    provider=self._provider,
+                    routing_strategy=self._routing_strategy,
                 )
             ],
         )
@@ -583,11 +645,12 @@ def api_name_for_url(
     """Return a stable human-readable API name."""
     parsed = urlparse(base_url)
     location = parsed.netloc or base_url
-    label = (
-        "OpenAI-compatible"
-        if backend == BACKEND_OPENAI_COMPATIBLE
-        else "Needle LLM"
-    )
+    if backend == BACKEND_HA_PROVIDER:
+        label = "Needle + HA model"
+    elif backend == BACKEND_OPENAI_COMPATIBLE:
+        label = "OpenAI-compatible"
+    else:
+        label = "Needle LLM"
     return f"{label} @ {location}"
 
 

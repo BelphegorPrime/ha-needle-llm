@@ -14,6 +14,8 @@ from .const import (
     CONF_BACKEND,
     CONF_MIN_CONFIDENCE,
     CONF_MODEL,
+    CONF_PROVIDER_MODEL,
+    CONF_ROUTING_STRATEGY,
     CONF_TIMEOUT,
     DEFAULT_BACKEND,
     DEFAULT_MIN_CONFIDENCE,
@@ -21,6 +23,7 @@ from .const import (
     DOMAIN,
     normalize_backend,
 )
+from .ha_pipeline import DEFAULT_STRATEGY
 from .llm_api import NeedleAPI, api_id_for_url, api_name_for_url
 from .openai_client import OpenAICompatibleClient
 
@@ -38,6 +41,13 @@ async def async_setup_entry(
         )
     )
     model = entry.options.get(CONF_MODEL, entry.data.get(CONF_MODEL, ""))
+    provider_model = entry.options.get(
+        CONF_PROVIDER_MODEL, entry.data.get(CONF_PROVIDER_MODEL, "")
+    )
+    strategy = entry.options.get(
+        CONF_ROUTING_STRATEGY,
+        entry.data.get(CONF_ROUTING_STRATEGY, DEFAULT_STRATEGY),
+    )
     request_timeout = entry.options.get(
         CONF_TIMEOUT,
         entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT),
@@ -63,6 +73,9 @@ async def async_setup_entry(
         client=client,
         backend=backend,
         minimum_confidence=minimum_confidence,
+        provider_model=provider_model,
+        routing_strategy=strategy,
+        timeout=request_timeout,
     )
 
     unregister = register_api_compat(hass, api)

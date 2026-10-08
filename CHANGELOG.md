@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0 - 2026-10-08
+
+- Add a provider-backed routing mode referencing an existing Home Assistant
+  llama.cpp conversation model by config entry and subentry IDs.
+- Reuse the loaded model client, credentials and endpoint without copying them.
+- Support Needle or model preselection followed by independent Needle
+  confidence-gated approval, and final argument extraction by the model.
+- Prevent preliminary model proposals from being executed. Final model calls
+  receive only the approved native Assist tool schema.
+- Keep the existing Needle and OpenAI-compatible HTTP modes for compatibility.
+- Add multilingual-safe literal entity-name matching and regression tests for
+  Needle/model disagreement and low-confidence refusal.
+
+
 ## 0.3.1 - 2026-10-08
 
 - Rename the generic OpenAI-compatible backend, client, route tool, validation
