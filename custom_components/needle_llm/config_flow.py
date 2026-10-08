@@ -12,10 +12,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .client import NeedleClient, NeedleClientError
 from .const import (
     CONF_MIN_CONFIDENCE,
-    CONF_RESET_BEFORE_CALL,
     CONF_TIMEOUT,
     DEFAULT_MIN_CONFIDENCE,
-    DEFAULT_RESET_BEFORE_CALL,
     DEFAULT_TIMEOUT,
     DOMAIN,
 )
@@ -80,9 +78,6 @@ class NeedleLLMConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                 CONF_MIN_CONFIDENCE: user_input[
                                     CONF_MIN_CONFIDENCE
                                 ],
-                                CONF_RESET_BEFORE_CALL: user_input[
-                                    CONF_RESET_BEFORE_CALL
-                                ],
                                 CONF_TIMEOUT: timeout,
                             },
                         )
@@ -99,10 +94,6 @@ class NeedleLLMConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         vol.Coerce(float),
                         vol.Range(min=0.0, max=1.0),
                     ),
-                    vol.Required(
-                        CONF_RESET_BEFORE_CALL,
-                        default=DEFAULT_RESET_BEFORE_CALL,
-                    ): bool,
                     vol.Required(
                         CONF_TIMEOUT,
                         default=DEFAULT_TIMEOUT,

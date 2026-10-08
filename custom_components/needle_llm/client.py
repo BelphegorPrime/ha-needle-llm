@@ -31,34 +31,20 @@ class NeedleClient:
         """Return model information from Needle."""
         return await self._async_json_request("GET", "/model")
 
-    async def async_reset(self) -> None:
-        """Reset Needle conversation state."""
-        try:
-            async with self._session.post(
-                f"{self._base_url}/reset",
-                timeout=self._timeout,
-            ) as response:
-                response.raise_for_status()
-                await response.read()
-        except (aiohttp.ClientError, TimeoutError) as err:
-            raise NeedleClientError("Unable to reset Needle") from err
-
     async def async_complete(
         self,
         *,
         tools: list[dict[str, Any]],
         query: str,
-        reset_before_call: bool,
     ) -> dict[str, Any]:
-        """Route one request through Needle.
+        """Route one stateless request through Needle.
 
-        The reset and complete requests share a lock so concurrent Home Assistant
-        requests cannot interleave their Needle conversation state.
+        Needle's playground server already starts every /complete request from a
+        fresh turn: it resets the current agent when the tool schema is unchanged
+        and creates a fresh agent when it changes. Serializing calls prevents
+        concurrent requests from sharing mutable server state.
         """
         async with self._route_lock:
-            if reset_before_call:
-                await self.async_reset()
-
             return await self._async_json_request(
                 "POST",
                 "/complete",
@@ -82,7 +68,9 @@ class NeedleClient:
                 response.raise_for_status()
                 data = await response.json()
         except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-            raise NeedleClientError(f"Needle request failed: {path}") from err
+            raise NeedleClientError(
+                f"Needle request failed: {path}: {err}"
+            ) from err
 
         if not isinstance(data, dict):
             raise NeedleClientError(f"Needle returned invalid JSON for {path}")

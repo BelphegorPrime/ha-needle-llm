@@ -42,12 +42,10 @@ class NeedleRouteTool(llm.Tool):
         client: NeedleClient,
         *,
         minimum_confidence: float,
-        reset_before_call: bool,
     ) -> None:
         """Initialize the routing tool."""
         self._client = client
         self._minimum_confidence = minimum_confidence
-        self._reset_before_call = reset_before_call
 
     async def async_call(
         self,
@@ -103,7 +101,6 @@ class NeedleRouteTool(llm.Tool):
             result = await self._client.async_complete(
                 tools=needle_tools,
                 query=query,
-                reset_before_call=self._reset_before_call,
             )
         except NeedleClientError as err:
             return _error(str(err))
@@ -180,13 +177,11 @@ class NeedleAPI(llm.API):
         name: str,
         client: NeedleClient,
         minimum_confidence: float,
-        reset_before_call: bool,
     ) -> None:
         """Initialize the API."""
         super().__init__(hass=hass, id=api_id, name=name)
         self._client = client
         self._minimum_confidence = minimum_confidence
-        self._reset_before_call = reset_before_call
 
     async def async_get_api_instance(
         self,
@@ -207,7 +202,6 @@ class NeedleAPI(llm.API):
                 NeedleRouteTool(
                     self._client,
                     minimum_confidence=self._minimum_confidence,
-                    reset_before_call=self._reset_before_call,
                 )
             ],
         )

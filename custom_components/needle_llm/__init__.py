@@ -11,10 +11,8 @@ from .client import NeedleClient
 from .compat import register_api_compat
 from .const import (
     CONF_MIN_CONFIDENCE,
-    CONF_RESET_BEFORE_CALL,
     CONF_TIMEOUT,
     DEFAULT_MIN_CONFIDENCE,
-    DEFAULT_RESET_BEFORE_CALL,
     DEFAULT_TIMEOUT,
     DOMAIN,
 )
@@ -42,10 +40,6 @@ async def async_setup_entry(
         minimum_confidence=entry.data.get(
             CONF_MIN_CONFIDENCE,
             DEFAULT_MIN_CONFIDENCE,
-        ),
-        reset_before_call=entry.data.get(
-            CONF_RESET_BEFORE_CALL,
-            DEFAULT_RESET_BEFORE_CALL,
         ),
     )
 
