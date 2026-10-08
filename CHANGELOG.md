@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.2 - 2026-10-08
+
+- Replace the overloaded options form with two guided pages: choose routing
+  mode first, then configure only its relevant fields.
+- Show human-friendly backend and preselection names rather than internal
+  identifiers and avoid repeating configured llama.cpp connection details.
+- Add structured, stage-by-stage `routing_trace` diagnostics including
+  preselection, independent Needle approval, argument generation,
+  HA execution and timings.
+- Preserve original raw diagnostics, provide explicit failed stages and
+  avoid falsely declaring devices missing when no lookup occurred.
+- Add tests for conditional configuration forms and routing trace results.
+
+
 ## 0.4.1 - 2026-10-08
 
 - Assign each HA provider-backed routing entry its own stable LLM API ID,

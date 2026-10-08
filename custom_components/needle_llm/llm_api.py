@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -46,6 +47,7 @@ from .target_guard import (
     find_unique_mentioned_entity,
     reconcile_named_target,
 )
+from .trace import build_routing_trace
 from .validation import (
     RouteRejected,
     approve_openai_route,
@@ -92,6 +94,7 @@ class NeedleRouteTool(llm.Tool):
         llm_context: llm.LLMContext,
     ) -> Any:
         """Route one request to the native Home Assistant Assist API."""
+        request_started = time.monotonic()
         query = tool_input.tool_args["query"]
 
         try:
@@ -143,6 +146,12 @@ class NeedleRouteTool(llm.Tool):
 
         diagnostics = {
             "backend": self._backend,
+            "request_language": llm_context.language,
+            "minimum_confidence": (
+                self._minimum_confidence
+                if self._backend != BACKEND_OPENAI_COMPATIBLE
+                else None
+            ),
             "available_tool_count": len(needle_tools),
             "skipped_tool_count": len(skipped_tools),
             "skipped_tools": skipped_tools,
@@ -227,8 +236,13 @@ class NeedleRouteTool(llm.Tool):
                         "stage": "validation",
                         "device_lookup_attempted": False,
                         "guidance": (
-                            "OpenAI-compatible did not produce an approved tool call. "
+                            "The model did not produce an approved tool call. "
                             "No Home Assistant action or device lookup ran."
+                        ),
+                        "routing_trace": build_routing_trace(
+                            diagnostics,
+                            status="rejected",
+                            stage="validation",
                         ),
                         "diagnostics": diagnostics,
                     },
@@ -377,6 +391,11 @@ class NeedleRouteTool(llm.Tool):
                             "No Home Assistant action or device lookup ran. "
                             "Do not conclude that the device is missing."
                         ),
+                        "routing_trace": build_routing_trace(
+                            diagnostics,
+                            status="rejected",
+                            stage="validation",
+                        ),
                         "diagnostics": diagnostics,
                     },
                     error=True,
@@ -482,11 +501,15 @@ class NeedleRouteTool(llm.Tool):
                 },
             )
 
+        execution_started = time.monotonic()
         try:
             native_result = await assist_api.async_call_tool(
                 llm.ToolInput(route.tool, arguments)
             )
         except HomeAssistantError as err:
+            diagnostics["ha_execution_ms"] = round(
+                (time.monotonic() - execution_started) * 1000, 1
+            )
             return _error(
                 f"Home Assistant rejected the routed tool call: {err}",
                 stage="home_assistant_execution",
@@ -497,6 +520,9 @@ class NeedleRouteTool(llm.Tool):
                 },
             )
         except Exception as err:  # noqa: BLE001
+            diagnostics["ha_execution_ms"] = round(
+                (time.monotonic() - execution_started) * 1000, 1
+            )
             _LOGGER.exception(
                 "Home Assistant tool %s failed",
                 route.tool,
@@ -512,7 +538,22 @@ class NeedleRouteTool(llm.Tool):
                 },
             )
 
+        diagnostics["ha_execution_ms"] = round(
+            (time.monotonic() - execution_started) * 1000, 1
+        )
         native_data, native_error = normalize_tool_result(native_result)
+        elapsed_ms = round(
+            (time.monotonic() - request_started) * 1000, 1
+        )
+        routing_trace = build_routing_trace(
+            diagnostics,
+            status="failed" if native_error else "success",
+            stage="home_assistant_execution" if native_error else "completed",
+            selected_tool=route.tool,
+            arguments=arguments,
+            home_assistant=native_data,
+            total_ms=elapsed_ms,
+        )
 
         return make_tool_result(
             {
@@ -527,9 +568,11 @@ class NeedleRouteTool(llm.Tool):
                 ),
                 "arguments": arguments,
                 "home_assistant": native_data,
+                "routing_trace": routing_trace,
                 "diagnostics": {
                     **diagnostics,
                     "stage": "completed",
+                    "total_ms": elapsed_ms,
                     "narrowed_from": len(needle_tools),
                     "narrowed_to": (
                         len(candidates)
@@ -566,6 +609,12 @@ class NeedleVerifiedRouteTool(NeedleRouteTool):
 
     name = "NeedleVerifiedRoute"
     title = "Home Assistant model routing verified by Needle"
+    description = (
+        "Use this tool for Home Assistant control or state requests when "
+        "Needle Verified Routing is selected. It provides full per-stage "
+        "routing details and performs native Assist actions only after "
+        "Needle approval. Pass the original user request unchanged."
+    )
 
 
 class NeedleAPI(llm.API):
@@ -692,6 +741,24 @@ def _error(
             "executed": False,
             "stage": stage,
             "reason": reason,
+            "routing_trace": build_routing_trace(
+                diagnostics or {},
+                status=(
+                    "failed"
+                    if stage == "home_assistant_execution"
+                    else "rejected"
+                ),
+                stage=stage,
+                selected_tool=(
+                    (diagnostics or {}).get("selected_tool")
+                ),
+                arguments=(diagnostics or {}).get("selected_arguments"),
+            ),
+            "guidance": (
+                "No Home Assistant device was found or acted on unless "
+                "home_assistant_execution occurred. Do not invent a target "
+                "lookup result."
+            ),
             "diagnostics": diagnostics or {},
         },
         error=True,

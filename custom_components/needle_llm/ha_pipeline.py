@@ -94,6 +94,7 @@ async def async_provider_route(
     tools_by_name = {tool["name"]: tool for tool in tools}
     discovery_tools = build_discovery_tools(tools)
     diagnostics["routing_strategy"] = strategy
+    diagnostics["minimum_confidence"] = minimum_confidence
 
     if strategy == STRATEGY_MODEL_FIRST:
         try:
@@ -115,6 +116,7 @@ async def async_provider_route(
             "source": "model",
             "candidate": tentative,
             "transport": transport,
+            "model_proposal": initial.get("choices"),
         }
     else:
         try:
@@ -131,6 +133,10 @@ async def async_provider_route(
             "candidates": candidates,
             "transport": transport,
             "confidence": initial.get("confidence"),
+            "function_calls": initial.get("function_calls", []),
+            "suppressed_calls": initial.get("suppressed_calls", []),
+            "validation": initial.get("validation", {}),
+            "reasoning": initial.get("reasoning"),
         }
         # Discovery is only a suggestion; suppressed calls are never approved.
         if len(candidates) != 1:
@@ -153,6 +159,7 @@ async def async_provider_route(
         "candidate": tentative,
         "transport": verification_transport,
         "confidence": verification.get("confidence"),
+        "reasoning": verification.get("reasoning"),
         "function_calls": verification.get("function_calls", []),
         "suppressed_calls": verification.get("suppressed_calls", []),
         "validation": verification.get("validation", {}),
@@ -216,6 +223,7 @@ async def async_provider_route(
     msg = choice.get("message") if isinstance(choice, dict) else {}
     diagnostics["route"] = {
         "approved_tool": approved.tool,
+        "generated_by": "ha_model",
         "transport": final_transport,
         "finish_reason": (
             choice.get("finish_reason")

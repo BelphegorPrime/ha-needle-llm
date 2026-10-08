@@ -1,36 +1,44 @@
 {
-  "title": "Needle LLM Tool Router",
+  "title": "Needle LLM – Tool Router",
   "config": {
     "step": {
       "user": {
-        "title": "Connect a tool router",
-        "description": "Use Needle alone or combine Needle with a model already configured in Home Assistant.",
+        "title": "Choose routing mode",
+        "description": "Choose how tools are selected. Recommended: Needle with a model already configured in Home Assistant. The next step shows only the relevant settings.",
         "data": {
-          "backend": "Routing backend",
-          "url": "Server URL",
-          "min_confidence": "Minimum Needle confidence",
-          "timeout": "Request timeout (seconds)",
-          "model": "Model ID (optional)",
-          "provider_model": "Existing Home Assistant model",
-          "routing_strategy": "Preselection strategy"
+          "backend": "Routing mode"
         },
         "data_description": {
-          "backend": "Needle, Needle with HA model, or direct OpenAI-compatible API.",
-          "url": "Needle URL in Needle/HA-provider modes; direct OpenAI-compatible URL only in direct mode.",
-          "min_confidence": "Needle only. OpenAI-compatible tool calls do not include calibrated confidence.",
-          "timeout": "HTTP timeout per request, up to 600 seconds.",
-          "model": "For OpenAI-compatible APIs: leave blank to select the first model from /v1/models.",
-          "provider_model": "Select a configured llama.cpp conversation model. No additional credentials required.",
-          "routing_strategy": "Needle or LLM preselection; Needle independently approves the action in both modes. HA model mode only."
+          "backend": "In the recommended mode Needle independently approves the model's proposal before Home Assistant can act."
+        }
+      },
+      "settings": {
+        "title": "Configure routing connection",
+        "description": "Mode: **{mode}**. {hint}",
+        "data": {
+          "provider_model": "Existing Home Assistant model",
+          "routing_strategy": "Who should preselect the tools?",
+          "url": "Server URL",
+          "min_confidence": "Minimum Needle confidence",
+          "timeout": "Timeout per model request (seconds)",
+          "model": "Model ID (optional)"
+        },
+        "data_description": {
+          "provider_model": "A configured llama.cpp model. Server URL, credentials and model ID are reused automatically from Home Assistant.",
+          "routing_strategy": "Both options require independent Needle approval. The existing HA model generates the final tool arguments.",
+          "url": "Needle server address for Needle modes; otherwise the OpenAI-compatible server base URL.",
+          "min_confidence": "Needle must approve the proposed action at this confidence or higher (default 0.80). Does not apply to direct API calls.",
+          "timeout": "Maximum duration of each individual Needle or model request.",
+          "model": "Only for the direct OpenAI-compatible API. Leave empty to select the first advertised model."
         }
       }
     },
     "error": {
-      "cannot_connect": "Model server unreachable or model endpoint unavailable.",
+      "cannot_connect": "The configured Needle or model server cannot be reached.",
       "invalid_response": "Invalid model endpoint response.",
-      "invalid_url": "Enter an http:// or https:// URL.",
-      "no_provider_models": "No loaded supported llama.cpp conversation model found.",
-      "invalid_provider_model": "Select an available model from an existing llama.cpp integration."
+      "invalid_url": "Enter a valid HTTP(S) server URL.",
+      "no_provider_models": "No supported loaded llama.cpp model integration is available.",
+      "invalid_provider_model": "Select an available loaded model."
     },
     "abort": {
       "already_configured": "This Needle server is already configured."
@@ -39,34 +47,42 @@
   "options": {
     "step": {
       "init": {
-        "title": "Configure tool router",
-        "description": "Choose a routing strategy and reference an existing HA model configuration.",
+        "title": "Choose routing mode",
+        "description": "Choose how tools are selected. Recommended: Needle with a model already configured in Home Assistant. The next step shows only the relevant settings.",
         "data": {
-          "backend": "Routing backend",
-          "url": "Server URL",
-          "min_confidence": "Minimum Needle confidence",
-          "timeout": "Request timeout (seconds)",
-          "model": "Model ID (optional)",
-          "provider_model": "Existing Home Assistant model",
-          "routing_strategy": "Preselection strategy"
+          "backend": "Routing mode"
         },
         "data_description": {
-          "backend": "Needle, Needle with HA model, or direct OpenAI-compatible API.",
-          "url": "Needle URL in Needle/HA-provider modes; direct OpenAI-compatible URL only in direct mode.",
-          "min_confidence": "Needle only. OpenAI-compatible tool calls do not include calibrated confidence.",
-          "timeout": "HTTP timeout per request, up to 600 seconds.",
-          "model": "For OpenAI-compatible APIs: leave blank to select the first model from /v1/models.",
-          "provider_model": "Select a configured llama.cpp conversation model. No additional credentials required.",
-          "routing_strategy": "Needle or LLM preselection; Needle independently approves the action in both modes. HA model mode only."
+          "backend": "In the recommended mode Needle independently approves the model's proposal before Home Assistant can act."
+        }
+      },
+      "settings": {
+        "title": "Configure routing connection",
+        "description": "Mode: **{mode}**. {hint}",
+        "data": {
+          "provider_model": "Existing Home Assistant model",
+          "routing_strategy": "Who should preselect the tools?",
+          "url": "Server URL",
+          "min_confidence": "Minimum Needle confidence",
+          "timeout": "Timeout per model request (seconds)",
+          "model": "Model ID (optional)"
+        },
+        "data_description": {
+          "provider_model": "A configured llama.cpp model. Server URL, credentials and model ID are reused automatically from Home Assistant.",
+          "routing_strategy": "Both options require independent Needle approval. The existing HA model generates the final tool arguments.",
+          "url": "Needle server address for Needle modes; otherwise the OpenAI-compatible server base URL.",
+          "min_confidence": "Needle must approve the proposed action at this confidence or higher (default 0.80). Does not apply to direct API calls.",
+          "timeout": "Maximum duration of each individual Needle or model request.",
+          "model": "Only for the direct OpenAI-compatible API. Leave empty to select the first advertised model."
         }
       }
     },
     "error": {
-      "cannot_connect": "Model server unreachable or model endpoint unavailable.",
+      "cannot_connect": "The configured Needle or model server cannot be reached.",
       "invalid_response": "Invalid model endpoint response.",
-      "invalid_url": "Enter an http:// or https:// URL.",
-      "no_provider_models": "No loaded supported llama.cpp conversation model found.",
-      "invalid_provider_model": "Select an available model from an existing llama.cpp integration."
+      "invalid_url": "Enter a valid HTTP(S) server URL.",
+      "no_provider_models": "No supported loaded llama.cpp model integration is available.",
+      "invalid_provider_model": "Select an available loaded model."
     }
   }
 }

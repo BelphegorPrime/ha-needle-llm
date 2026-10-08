@@ -1,4 +1,4 @@
-"""Config and options flow for Needle and reusable model providers."""
+"""Guided configuration for Needle and reusable HA model providers."""
 
 from __future__ import annotations
 
@@ -9,6 +9,12 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_URL
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from .client import NeedleClient, NeedleClientError
 from .const import (
@@ -27,257 +33,339 @@ from .const import (
     DOMAIN,
     normalize_backend,
 )
-from .ha_pipeline import DEFAULT_STRATEGY, STRATEGIES
+from .ha_pipeline import (
+    DEFAULT_STRATEGY,
+    STRATEGY_MODEL_FIRST,
+    STRATEGY_NEEDLE_FIRST,
+)
 from .ha_provider import available_provider_models
 from .openai_client import OpenAICompatibleClient, OpenAICompatibleClientError
 
+_BACKEND_LABELS = {
+    BACKEND_HA_PROVIDER: "Needle + existing Home Assistant model (recommended)",
+    BACKEND_NEEDLE: "Needle only (standalone)",
+    BACKEND_OPENAI_COMPATIBLE: "Direct OpenAI-compatible API (without Needle)",
+}
+_STRATEGY_LABELS = {
+    STRATEGY_MODEL_FIRST: "HA model chooses tools, Needle verifies",
+    STRATEGY_NEEDLE_FIRST: "Needle chooses tools, Needle verifies",
+}
+_MODE_HINTS = {
+    BACKEND_HA_PROVIDER: (
+        "Choose the existing Home Assistant model and who preselects tools. "
+        "The URL on this page is exclusively for the Needle server."
+    ),
+    BACKEND_NEEDLE: (
+        "Needle selects the tool and generates its arguments. "
+        "Only the Needle server address is required."
+    ),
+    BACKEND_OPENAI_COMPATIBLE: (
+        "The model handles routing directly without Needle. "
+        "Enter the OpenAI-compatible inference server URL."
+    ),
+}
 
-def _normalize_url(value: str) -> str:
-    """Normalize a server base URL."""
-    return value.strip().rstrip("/")
+
+def _selector(labels: dict[str, str]) -> SelectSelector:
+    """Give choices human-friendly labels rather than internal identifiers."""
+    return SelectSelector(
+        SelectSelectorConfig(
+            options=[
+                SelectOptionDict(value=value, label=label)
+                for value, label in labels.items()
+            ],
+            mode=SelectSelectorMode.DROPDOWN,
+        )
+    )
 
 
-def _entry_title(base_url: str, backend: str) -> str:
-    """Create a readable entry name."""
-    parsed = urlparse(base_url)
-    location = parsed.netloc or base_url
-    if backend == BACKEND_HA_PROVIDER:
-        label = "Needle + HA model"
-    elif backend == BACKEND_OPENAI_COMPATIBLE:
-        label = "OpenAI-compatible"
-    else:
-        label = "Needle"
-    return f"{label} @ {location}"
-
-
-def _schema(
-    *,
-    url: str | None = None,
-    backend: str = DEFAULT_BACKEND,
-    model: str = "",
-    provider_model: str = "",
-    provider_choices: dict[str, str] | None = None,
-    routing_strategy: str = DEFAULT_STRATEGY,
-    min_confidence: float = DEFAULT_MIN_CONFIDENCE,
-    timeout: int = DEFAULT_TIMEOUT,
-) -> vol.Schema:
-    """Build the form, selecting existing HA model subentries by their IDs."""
-    url_marker = vol.Required(CONF_URL)
-    if url is not None:
-        url_marker = vol.Required(CONF_URL, default=url)
-    choices = {"": "Select a configured model"}
-    choices.update(provider_choices or {})
-    if provider_model and provider_model not in choices:
-        choices[provider_model] = "Previously selected (now unavailable)"
-
+def _mode_schema(backend: str) -> vol.Schema:
+    """First page: what sort of routing should Home Assistant use?"""
     return vol.Schema(
         {
-            vol.Required(CONF_BACKEND, default=backend): vol.In(
-                [BACKEND_NEEDLE, BACKEND_HA_PROVIDER, BACKEND_OPENAI_COMPATIBLE]
-            ),
-            url_marker: str,
-            vol.Optional(CONF_PROVIDER_MODEL, default=provider_model): vol.In(
-                choices
-            ),
-            vol.Optional(
-                CONF_ROUTING_STRATEGY, default=routing_strategy
-            ): vol.In(STRATEGIES),
-            vol.Optional(CONF_MODEL, default=model): str,
-            vol.Required(
-                CONF_MIN_CONFIDENCE, default=min_confidence
-            ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
-            vol.Required(CONF_TIMEOUT, default=timeout): vol.All(
-                vol.Coerce(int), vol.Range(min=1, max=600)
-            ),
+            vol.Required(CONF_BACKEND, default=backend): _selector(
+                _BACKEND_LABELS
+            )
         }
     )
 
 
-async def _async_validate_connection(
-    hass,
-    base_url: str,
-    request_timeout: int,
+def _settings_schema(
+    *,
     backend: str,
-    model: str,
+    provider_choices: dict[str, str],
+    values: dict,
+) -> vol.Schema:
+    """Second page: show *only* settings relevant to this routing mode."""
+    url = values.get(CONF_URL)
+    url_marker = vol.Required(CONF_URL)
+    if url is not None:
+        url_marker = vol.Required(CONF_URL, default=url)
+
+    fields: dict = {}
+    if backend == BACKEND_HA_PROVIDER:
+        # Put the model and understandable strategy before technical URL fields.
+        models = dict(provider_choices)
+        old_selection = values.get(CONF_PROVIDER_MODEL)
+        if old_selection and old_selection not in models:
+            models[old_selection] = "Previously selected (unavailable)"
+        if models:
+            selected = (
+                old_selection if old_selection in models
+                else next(iter(models))
+            )
+            fields[vol.Required(
+                CONF_PROVIDER_MODEL, default=selected
+            )] = _selector(models)
+        else:
+            fields[vol.Required(CONF_PROVIDER_MODEL)] = _selector(
+                {"": "No supported model configured"}
+            )
+        fields[vol.Required(
+            CONF_ROUTING_STRATEGY,
+            default=values.get(CONF_ROUTING_STRATEGY, DEFAULT_STRATEGY),
+        )] = _selector(_STRATEGY_LABELS)
+        fields[url_marker] = str
+        fields[vol.Required(
+            CONF_MIN_CONFIDENCE,
+            default=values.get(
+                CONF_MIN_CONFIDENCE, DEFAULT_MIN_CONFIDENCE
+            ),
+        )] = vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0))
+    elif backend == BACKEND_NEEDLE:
+        fields[url_marker] = str
+        fields[vol.Required(
+            CONF_MIN_CONFIDENCE,
+            default=values.get(
+                CONF_MIN_CONFIDENCE, DEFAULT_MIN_CONFIDENCE
+            ),
+        )] = vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0))
+    else:
+        fields[url_marker] = str
+        fields[vol.Optional(
+            CONF_MODEL, default=values.get(CONF_MODEL, "")
+        )] = str
+
+    fields[vol.Required(
+        CONF_TIMEOUT, default=values.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
+    )] = vol.All(vol.Coerce(int), vol.Range(min=1, max=600))
+    return vol.Schema(fields)
+
+
+def _normalize_url(value: str) -> str:
+    """Normalize the backend URL."""
+    return value.strip().rstrip("/")
+
+
+def _entry_title(base_url: str, backend: str) -> str:
+    """Describe the active mode without a technical backend name."""
+    location = urlparse(base_url).netloc or base_url
+    if backend == BACKEND_HA_PROVIDER:
+        name = "Needle + HA model"
+    elif backend == BACKEND_OPENAI_COMPATIBLE:
+        name = "OpenAI-compatible"
+    else:
+        name = "Needle"
+    return f"{name} @ {location}"
+
+
+async def _async_validate_connection(
+    hass, base_url: str, request_timeout: int, backend: str, model: str
 ) -> str | None:
-    """Validate Needle or direct OpenAI HTTP endpoint as appropriate."""
+    """Validate the endpoint while keeping the provider's URL/keys private."""
     if not base_url.startswith(("http://", "https://")):
         return "invalid_url"
-
     if backend == BACKEND_OPENAI_COMPATIBLE:
         client = OpenAICompatibleClient(
             async_get_clientsession(hass), base_url, request_timeout, model
         )
     else:
-        # The provider-backed mode still requires Needle for approval.
         client = NeedleClient(
             async_get_clientsession(hass), base_url, request_timeout
         )
-
     try:
-        model_info = await client.async_get_model()
+        details = await client.async_get_model()
     except (NeedleClientError, OpenAICompatibleClientError):
         return "cannot_connect"
-
-    if not isinstance(model_info.get("name"), str) or not model_info["name"]:
+    if not isinstance(details.get("name"), str) or not details["name"]:
         return "invalid_response"
     return None
 
 
-def _provider_error(hass, backend: str, selected: str) -> str | None:
-    """Require an explicitly selected, currently loaded model provider."""
+def _provider_error(hass, backend: str, selection: str) -> str | None:
+    """Only accept a loaded and currently selectable model reference."""
     if backend != BACKEND_HA_PROVIDER:
         return None
     choices = available_provider_models(hass)
     if not choices:
         return "no_provider_models"
-    if not selected or selected not in choices:
+    if selection not in choices:
         return "invalid_provider_model"
     return None
 
 
+def _effective_values(backend: str, submitted: dict, previous: dict) -> dict:
+    """Preserve hidden fields for switching modes without re-entering them."""
+    result = dict(previous)
+    result.update(submitted)
+    result[CONF_BACKEND] = backend
+    return result
+
+
 class NeedleLLMConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Create one Needle or provider-backed routing entry."""
+    """Guided initial setup with a mode page followed by relevant settings."""
 
     VERSION = 1
+
+    def __init__(self) -> None:
+        """Keep the backend selection until the connection page is submitted."""
+        self._selected_backend = DEFAULT_BACKEND
 
     @staticmethod
     @callback
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
     ) -> NeedleLLMOptionsFlow:
-        """Configure an existing routing entry."""
+        """Configure an existing connection."""
         return NeedleLLMOptionsFlow(config_entry)
 
     async def async_step_user(
-        self,
-        user_input: dict | None = None,
+        self, user_input: dict | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Handle initial setup."""
-        errors: dict[str, str] = {}
+        """Select the routing mode before showing the server settings."""
         if user_input is not None:
-            base_url = _normalize_url(user_input[CONF_URL])
-            backend = normalize_backend(
-                user_input.get(CONF_BACKEND, DEFAULT_BACKEND)
+            self._selected_backend = normalize_backend(
+                user_input[CONF_BACKEND]
             )
-            model = user_input.get(CONF_MODEL, "")
+            return await self.async_step_settings()
+        return self.async_show_form(
+            step_id="user",
+            data_schema=_mode_schema(self._selected_backend),
+        )
+
+    async def async_step_settings(
+        self, user_input: dict | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Configure only the active backend and validate before saving."""
+        errors: dict[str, str] = {}
+        backend = self._selected_backend
+        if user_input is not None:
+            url = _normalize_url(user_input[CONF_URL])
             provider_model = user_input.get(CONF_PROVIDER_MODEL, "")
-            strategy = user_input.get(
-                CONF_ROUTING_STRATEGY, DEFAULT_STRATEGY
-            )
-            request_timeout = user_input[CONF_TIMEOUT]
+            model = user_input.get(CONF_MODEL, "")
             error = _provider_error(self.hass, backend, provider_model)
             if error is None:
                 error = await _async_validate_connection(
-                    self.hass, base_url, request_timeout, backend, model
+                    self.hass, url, user_input[CONF_TIMEOUT], backend, model
                 )
-
             if error is not None:
                 errors["base"] = error
             else:
-                identity = (
-                    base_url if backend == BACKEND_NEEDLE
-                    else f"{backend}:{base_url}:{provider_model}"
+                unique_id = (
+                    url if backend == BACKEND_NEEDLE
+                    else f"{backend}:{url}:{provider_model}"
                 )
-                await self.async_set_unique_id(identity)
+                await self.async_set_unique_id(unique_id)
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
-                    title=_entry_title(base_url, backend),
-                    data={
-                        CONF_BACKEND: backend,
-                        CONF_URL: base_url,
-                        CONF_MODEL: model,
-                        CONF_PROVIDER_MODEL: provider_model,
-                        CONF_ROUTING_STRATEGY: strategy,
-                        CONF_MIN_CONFIDENCE: user_input[CONF_MIN_CONFIDENCE],
-                        CONF_TIMEOUT: request_timeout,
-                    },
+                    title=_entry_title(url, backend),
+                    data=_effective_values(
+                        backend,
+                        {**user_input, CONF_URL: url},
+                        {
+                            CONF_MIN_CONFIDENCE: DEFAULT_MIN_CONFIDENCE,
+                            CONF_ROUTING_STRATEGY: DEFAULT_STRATEGY,
+                            CONF_MODEL: "",
+                            CONF_PROVIDER_MODEL: "",
+                        },
+                    ),
                 )
 
         return self.async_show_form(
-            step_id="user",
-            data_schema=_schema(
-                provider_choices=available_provider_models(self.hass)
+            step_id="settings",
+            data_schema=_settings_schema(
+                backend=backend,
+                provider_choices=available_provider_models(self.hass),
+                values=user_input or {},
             ),
             errors=errors,
+            description_placeholders={
+                "mode": _BACKEND_LABELS[backend],
+                "hint": _MODE_HINTS[backend],
+            },
         )
 
 
 class NeedleLLMOptionsFlow(config_entries.OptionsFlowWithConfigEntry):
-    """Edit routing without duplicating provider API keys or connection URLs."""
+    """Guided options flow preserving old, unselected settings."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Keep the currently configured mode and server settings."""
+        super().__init__(config_entry)
+        self._current = {
+            **config_entry.data,
+            **config_entry.options,
+        }
+        self._selected_backend = normalize_backend(
+            self._current.get(CONF_BACKEND, DEFAULT_BACKEND)
+        )
 
     async def async_step_init(
-        self,
-        user_input: dict | None = None,
+        self, user_input: dict | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Edit the active routing backend."""
-        errors: dict[str, str] = {}
-        saved = self.config_entry.data
-        options = self.config_entry.options
-
-        current_backend = normalize_backend(
-            options.get(CONF_BACKEND, saved.get(CONF_BACKEND, DEFAULT_BACKEND))
-        )
-        current_url = options.get(CONF_URL, saved[CONF_URL])
-        current_model = options.get(CONF_MODEL, saved.get(CONF_MODEL, ""))
-        current_provider = options.get(
-            CONF_PROVIDER_MODEL, saved.get(CONF_PROVIDER_MODEL, "")
-        )
-        current_strategy = options.get(
-            CONF_ROUTING_STRATEGY,
-            saved.get(CONF_ROUTING_STRATEGY, DEFAULT_STRATEGY),
-        )
-        current_confidence = options.get(
-            CONF_MIN_CONFIDENCE,
-            saved.get(CONF_MIN_CONFIDENCE, DEFAULT_MIN_CONFIDENCE),
-        )
-        current_timeout = options.get(
-            CONF_TIMEOUT, saved.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
-        )
-
+        """First choose which routing strategy family to configure."""
         if user_input is not None:
-            base_url = _normalize_url(user_input[CONF_URL])
-            backend = normalize_backend(
-                user_input.get(CONF_BACKEND, DEFAULT_BACKEND)
+            self._selected_backend = normalize_backend(
+                user_input[CONF_BACKEND]
             )
-            model = user_input.get(CONF_MODEL, "")
-            provider_model = user_input.get(CONF_PROVIDER_MODEL, "")
-            strategy = user_input.get(
-                CONF_ROUTING_STRATEGY, DEFAULT_STRATEGY
+            return await self.async_step_settings()
+        return self.async_show_form(
+            step_id="init",
+            data_schema=_mode_schema(self._selected_backend),
+        )
+
+    async def async_step_settings(
+        self, user_input: dict | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Only show fields relevant to the selected mode."""
+        errors: dict[str, str] = {}
+        backend = self._selected_backend
+        if user_input is not None:
+            url = _normalize_url(user_input[CONF_URL])
+            provider_model = user_input.get(
+                CONF_PROVIDER_MODEL,
+                self._current.get(CONF_PROVIDER_MODEL, ""),
             )
-            request_timeout = user_input[CONF_TIMEOUT]
+            model = user_input.get(
+                CONF_MODEL, self._current.get(CONF_MODEL, "")
+            )
             error = _provider_error(self.hass, backend, provider_model)
             if error is None:
                 error = await _async_validate_connection(
-                    self.hass, base_url, request_timeout, backend, model
+                    self.hass, url, user_input[CONF_TIMEOUT], backend, model
                 )
             if error is not None:
                 errors["base"] = error
             else:
                 return self.async_create_entry(
                     title="",
-                    data={
-                        CONF_BACKEND: backend,
-                        CONF_URL: base_url,
-                        CONF_MODEL: model,
-                        CONF_PROVIDER_MODEL: provider_model,
-                        CONF_ROUTING_STRATEGY: strategy,
-                        CONF_MIN_CONFIDENCE: user_input[CONF_MIN_CONFIDENCE],
-                        CONF_TIMEOUT: request_timeout,
-                    },
+                    data=_effective_values(
+                        backend, {**user_input, CONF_URL: url}, self._current
+                    ),
                 )
 
         return self.async_show_form(
-            step_id="init",
-            data_schema=_schema(
-                backend=current_backend,
-                url=current_url,
-                model=current_model,
-                provider_model=current_provider,
+            step_id="settings",
+            data_schema=_settings_schema(
+                backend=backend,
                 provider_choices=available_provider_models(self.hass),
-                routing_strategy=current_strategy,
-                min_confidence=current_confidence,
-                timeout=current_timeout,
+                values=_effective_values(
+                    backend, user_input or {}, self._current
+                ),
             ),
             errors=errors,
+            description_placeholders={
+                "mode": _BACKEND_LABELS[backend],
+                "hint": _MODE_HINTS[backend],
+            },
         )

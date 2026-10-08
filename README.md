@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.4.1
+0.4.2
 ```
 
 ## License
@@ -469,3 +469,50 @@ implicit tool execution or recursion.
 **Latency:** Both strategies still run a Needle approval pass. This is a
 correctness/safety-focused prototype, not yet proven faster than native HA
 tool calling. Benchmarking remains essential.
+
+
+## Clearer setup and execution details (v0.4.2)
+
+The configuration wizard has **two steps**. First select the routing mode using
+readable labels. The second page displays **only settings relevant** to that
+mode:
+
+| Mode | Settings shown |
+| --- | --- |
+| Needle + existing HA model | Existing HA model, preselection strategy, Needle URL, minimum Needle confidence, timeout |
+| Needle only | Needle URL, minimum Needle confidence, timeout |
+| Direct OpenAI-compatible | Model server URL, optional model ID, timeout |
+
+Provider-backed routing **never asks you to re-enter** your llama.cpp endpoint,
+API key or model ID. The provider picker reuses your configured HA model.
+Switching modes preserves hidden settings, and all existing config entries stay
+compatible.
+
+### How to verify that the router was actually used
+
+In your conversation agent, select the **Needle + HA model** tool API and call
+**`NeedleVerifiedRoute`**. If the Assist trace shows only
+`light__HassLightSet` or `intent__HassTurnOff` as the *outer* tool,
+your conversation model may be using the **native Assist API directly**,
+not our integration. Check that the agent isn't also given the native
+Home Assistant Assist tool API alongside the Needle router, then retry.
+The native Assist tools are still used *internally* after approval.
+
+### New routing details
+
+When the router actually receives a call, its tool result contains a
+`routing_trace` alongside `diagnostics` with:
+- Executed/rejected status, routing backend, strategy, selected tool,
+  and original request language.
+- A chronological breakdown of tool preselection, independent Needle
+  approval, final argument generation and native HA execution.
+- Needle confidence and approval result, the tool chosen in each stage,
+  model-proposed arguments and the final validated arguments.
+- Measured stage durations and, on successful native responses, total
+  end-to-end latency and the target entities reported by Home Assistant.
+- Explicit failure stage on rejected routes. No false claim of an HA
+  device lookup when execution never reached Home Assistant.
+
+The trace is diagnostic JSON, not a frontend-only visualization.
+No underlying model HTTP credentials are included. Device names and user
+commands may still appear in the local Assist trace, so review before sharing.
