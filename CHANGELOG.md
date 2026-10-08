@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 - 2026-10-08
+
+- Include Needle candidate calls, suppressed calls, reasoning, validation data,
+  response type and available tool count when a route is rejected.
+- This makes low-confidence routing failures diagnosable directly from Home
+  Assistant's "Show details" output without lowering the safety threshold.
+
+
 ## 0.1.2 - 2026-10-08
 
 - Make the registered Home Assistant LLM API ID deterministic from the Needle URL.

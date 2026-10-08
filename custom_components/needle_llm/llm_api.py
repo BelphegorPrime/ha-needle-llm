@@ -118,6 +118,12 @@ class NeedleRouteTool(llm.Tool):
                     "executed": False,
                     "reason": str(err),
                     "confidence": result.get("confidence"),
+                    "needle_type": result.get("type"),
+                    "function_calls": result.get("function_calls") or [],
+                    "suppressed_calls": result.get("suppressed_calls") or [],
+                    "reasoning": result.get("reasoning"),
+                    "validation": result.get("validation") or {},
+                    "available_tool_count": len(needle_tools),
                 },
                 error=True,
             )
