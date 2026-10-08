@@ -1,11 +1,11 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - master
-    paths:
-      - custom_components/needle_llm/manifest.json
+  workflow_run:
+    workflows:
+      - Validate
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -13,11 +13,31 @@ permissions:
 
 jobs:
   release:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'master'
+      )
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Resolve validated commit
+        id: target
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            echo "sha=$VALIDATED_SHA" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=master" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out validated repository state
         uses: actions/checkout@v4
         with:
+          ref: ${{ steps.target.outputs.sha }}
           fetch-depth: 0
 
       - name: Read integration version
@@ -56,9 +76,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
         shell: bash
         run: |
           gh release create "$TAG" \
-            --target "$GITHUB_SHA" \
+            --target "$TARGET_SHA" \
             --title "Needle LLM $VERSION" \
             --generate-notes
