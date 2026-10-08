@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.6 - 2026-10-08
+
+- Guard against hallucinated device_class filters even when Needle reports
+  high confidence and valid syntax.
+- When a name appears explicitly in the original user request and matches
+  exactly one exposed Home Assistant entity, remove an unrequested conflicting
+  device_class and restrict the call to the matched entity's real domain.
+- Do not repair ambiguous targets, conflicting domain filters or explicitly
+  requested conflicting classes. Keep Home Assistant as the final authority.
+- Include target_guard repair details in the conversation trace.
+
+
 ## 0.2.5 - 2026-10-08
 
 - Keep operation-first guidance only in the discovery pass.

@@ -8,6 +8,10 @@ from custom_components.needle_llm.routing import (
     candidate_tool_names,
     execution_tool,
 )
+from custom_components.needle_llm.target_guard import (
+    TargetGuardRejected,
+    reconcile_named_target,
+)
 from custom_components.needle_llm.validation import (
     RouteRejected,
     approve_route,
@@ -232,3 +236,91 @@ def test_execution_tool_does_not_append_discovery_instructions() -> None:
     result = execution_tool(tool)
     assert result["description"] == "Sets color or brightness."
     assert result["parameters"] is tool["parameters"]
+
+
+
+def test_repair_wrong_class_only_for_unique_exposed_name() -> None:
+    """A hallucinated class can be removed for one explicit exposed entity."""
+    schema = {
+        "properties": {
+            "name": {"type": "string"},
+            "area": {"type": "string"},
+            "domain": {"type": "array"},
+            "device_class": {"type": "array"},
+        }
+    }
+    arguments = {
+        "name": "Wohnzimmerlampe",
+        "area": "Wohnzimmer",
+        "device_class": ["blind"],
+    }
+    entities = [
+        {
+            "name": "Wohnzimmerlampe",
+            "entity_id": "light.wohnzimmerlampe",
+            "device_class": None,
+        }
+    ]
+
+    repaired, details = reconcile_named_target(
+        "Schalte die Wohnzimmerlampe aus", arguments, schema, entities
+    )
+
+    assert repaired == {
+        "name": "Wohnzimmerlampe",
+        "area": "Wohnzimmer",
+        "domain": ["light"],
+    }
+    assert details["status"] == "repaired_unrequested_device_class"
+    assert arguments["device_class"] == ["blind"]
+
+
+def test_never_repair_ambiguous_named_entities() -> None:
+    """Identical exposed names across domains must remain constrained."""
+    arguments = {"name": "Wohnzimmerlampe", "device_class": ["blind"]}
+    entities = [
+        {"name": "Wohnzimmerlampe", "entity_id": "light.one"},
+        {"name": "Wohnzimmerlampe", "entity_id": "switch.two"},
+    ]
+    repaired, details = reconcile_named_target(
+        "Wohnzimmerlampe aus", arguments, {}, entities
+    )
+    assert repaired == arguments
+    assert details["status"] == "not_unique_or_not_exposed"
+
+
+def test_never_repair_substring_or_unexposed_target() -> None:
+    """The full named target must be present in the original request."""
+    arguments = {"name": "Tor", "device_class": ["blind"]}
+    entities = [{"name": "Tor", "entity_id": "switch.gate"}]
+    repaired, details = reconcile_named_target(
+        "Schalte das Einfahrtstor aus", arguments, {}, entities
+    )
+    assert repaired == arguments
+    assert details["status"] == "unchanged"
+
+
+def test_never_repair_explicit_conflicting_class() -> None:
+    """An explicitly requested contradictory class must fail closed."""
+    with pytest.raises(TargetGuardRejected, match="explicitly requested"):
+        reconcile_named_target(
+            "Schalte die blind Wohnzimmerlampe aus",
+            {"name": "Wohnzimmerlampe", "device_class": ["blind"]},
+            {},
+            [{"name": "Wohnzimmerlampe", "entity_id": "light.lamp"}],
+        )
+
+
+def test_never_repair_conflicting_domain() -> None:
+    """A conflicting domain cannot be changed silently."""
+    with pytest.raises(TargetGuardRejected, match="conflicting domain"):
+        reconcile_named_target(
+            "Schalte die Wohnzimmerlampe aus",
+            {
+                "name": "Wohnzimmerlampe",
+                "domain": ["switch"],
+                "device_class": ["blind"],
+            },
+            {"properties": {"domain": {}}},
+            [{"name": "Wohnzimmerlampe", "entity_id": "light.lamp"}],
+        )

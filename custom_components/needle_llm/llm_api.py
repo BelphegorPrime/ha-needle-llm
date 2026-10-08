@@ -7,6 +7,9 @@ import logging
 from typing import Any
 from urllib.parse import urlparse
 
+from homeassistant.components.homeassistant.exposed_entities import (
+    async_should_expose,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import llm
@@ -25,6 +28,7 @@ from .routing import (
     candidate_tool_names,
     execution_tool,
 )
+from .target_guard import TargetGuardRejected, reconcile_named_target
 from .validation import RouteRejected, approve_route
 
 _LOGGER = logging.getLogger(__name__)
@@ -119,7 +123,7 @@ class NeedleRouteTool(llm.Tool):
         discovery_tools = build_discovery_tools(needle_tools)
         routed_query = build_routing_query(query)
 
-        diagnostics["routing_strategy"] = "two_stage_raw_arguments_v3"
+        diagnostics["routing_strategy"] = "two_stage_target_guard_v4"
 
         try:
             discovery_result, discovery_transport = (
@@ -223,8 +227,47 @@ class NeedleRouteTool(llm.Tool):
                 diagnostics=diagnostics,
             )
 
+        arguments = route.arguments
+        if "device_class" in arguments:
+            name = arguments.get("name")
+            exposed_entities: list[dict[str, Any]] = []
+            if isinstance(name, str) and name.strip():
+                for state in hass.states.async_all():
+                    if state.name.casefold() != name.casefold():
+                        continue
+                    if not async_should_expose(
+                        hass, llm_context.assistant, state.entity_id
+                    ):
+                        continue
+                    exposed_entities.append(
+                        {
+                            "name": state.name,
+                            "entity_id": state.entity_id,
+                            "device_class": state.attributes.get("device_class"),
+                        }
+                    )
+
+            try:
+                arguments, target_guard = reconcile_named_target(
+                    query,
+                    arguments,
+                    tools_by_serialized_name[route.tool]["parameters"],
+                    exposed_entities,
+                )
+            except TargetGuardRejected as err:
+                return _error(
+                    f"Needle's entity filters are contradictory: {err}",
+                    stage="target_validation",
+                    diagnostics={
+                        **diagnostics,
+                        "selected_tool": route.tool,
+                        "selected_arguments": route.arguments,
+                    },
+                )
+            diagnostics["target_guard"] = target_guard
+
         try:
-            target_tool.parameters(route.arguments)
+            target_tool.parameters(arguments)
         except Exception as err:  # noqa: BLE001
             return _error(
                 f"Home Assistant rejected Needle arguments: {err}",
@@ -232,13 +275,13 @@ class NeedleRouteTool(llm.Tool):
                 diagnostics={
                     **diagnostics,
                     "selected_tool": route.tool,
-                    "selected_arguments": route.arguments,
+                    "selected_arguments": arguments,
                 },
             )
 
         try:
             native_result = await assist_api.async_call_tool(
-                llm.ToolInput(route.tool, route.arguments)
+                llm.ToolInput(route.tool, arguments)
             )
         except HomeAssistantError as err:
             return _error(
@@ -247,7 +290,7 @@ class NeedleRouteTool(llm.Tool):
                 diagnostics={
                     **diagnostics,
                     "selected_tool": route.tool,
-                    "selected_arguments": route.arguments,
+                    "selected_arguments": arguments,
                 },
             )
         except Exception as err:  # noqa: BLE001
@@ -261,7 +304,7 @@ class NeedleRouteTool(llm.Tool):
                 diagnostics={
                     **diagnostics,
                     "selected_tool": route.tool,
-                    "selected_arguments": route.arguments,
+                    "selected_arguments": arguments,
                     "exception_type": type(err).__name__,
                 },
             )
@@ -273,7 +316,7 @@ class NeedleRouteTool(llm.Tool):
                 "executed": not native_error,
                 "needle_tool": route.tool,
                 "needle_confidence": route.confidence,
-                "arguments": route.arguments,
+                "arguments": arguments,
                 "home_assistant": native_data,
                 "diagnostics": {
                     **diagnostics,
@@ -281,7 +324,7 @@ class NeedleRouteTool(llm.Tool):
                     "narrowed_from": len(needle_tools),
                     "narrowed_to": len(candidates),
                     "selected_tool": route.tool,
-                    "selected_arguments": route.arguments,
+                    "selected_arguments": arguments,
                 },
             },
             error=native_error,

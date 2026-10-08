@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.2.5
+0.2.6
 ```
 
 ## License
