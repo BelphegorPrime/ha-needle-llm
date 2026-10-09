@@ -34,6 +34,7 @@ from .ha_pipeline import (
     async_provider_route,
 )
 from .ha_provider import HomeAssistantModelProvider
+from .request_guard import no_action_reason
 from .routing import (
     build_discovery_tools,
     build_routing_query,
@@ -45,7 +46,6 @@ from .target_guard import (
     find_unique_mentioned_entity,
     reconcile_named_target,
 )
-from .request_guard import no_action_reason
 from .trace import build_routing_trace
 from .validation import (
     RouteRejected,
