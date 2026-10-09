@@ -300,7 +300,8 @@ async def test_low_confidence_agreement_recovers_after_english_approval() -> Non
     )
     assert result.route.tool == "intent__HassTurnOn"
     assert result.route.arguments == {"area": "Wohnzimmer", "domain": ["light"]}
-    assert diag["needle_approval"]["confidence"] == 0.222
+    assert diag["needle_approval"]["original_confidence"] == 0.222
+    assert diag["needle_approval"]["confidence"] == 0.94
     assert diag["needle_approval"]["english_fallback"]["accepted"] is True
     assert diag["needle_approval"]["english_fallback"]["confidence"] == 0.94
     assert needle.async_complete.await_args.kwargs["stage"] == "approval_english"
