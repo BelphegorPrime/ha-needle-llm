@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.5.7
+0.6.0
 ```
 
 ## License
@@ -674,3 +674,21 @@ gate blindly. Measure examples with the exact server/tool descriptions,
 consider a confidence-preserving platform fine-tune, or use an explicit user
 confirmation flow. A local Needle 3 LoRA build can omit the confidence head,
 and this integration intentionally rejects missing confidence values.
+
+
+## Experimental, resource-constrained multilingual training
+
+The reproducible six-language synthetic corpus, disjoint train/validation/test
+splits, read-only Needle baseline benchmark, safety comparison and CPU-limited
+LoRA training container are documented in
+[training/README.md](training/README.md).
+
+**Important:** These training tools do not run in Home Assistant, install a
+background worker or modify the active Needle add-on. The default training
+container is limited to **one CPU, 4 GiB RAM and no swap**. The upstream local
+Needle LoRA export **does not include a calibrated confidence head**; it is
+**not** eligible to bypass the integration's existing 0.8 confidence gate.
+Fine-tuned weights must be evaluated separately before any deployment.
+
+Related work: [multilingual benchmark #1](https://github.com/BelphegorPrime/ha-needle-llm/issues/1),
+[model evaluation and training #4](https://github.com/BelphegorPrime/ha-needle-llm/issues/4).
