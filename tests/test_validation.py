@@ -550,3 +550,10 @@ def test_semantic_aliases_fail_to_native_names_on_title_collision() -> None:
         "intent__HassTurnOn": "intent__HassTurnOn",
         "intent__HassTurnOff": "intent__HassTurnOff",
     }
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), -0.1, 1.1])
+def test_nonfinite_or_out_of_range_confidence_rejected(invalid: float) -> None:
+    """Nonfinite numbers must never bypass Needle's confidence gate."""
+    with pytest.raises(RouteRejected, match="invalid confidence"):
+        approve_route(_result(confidence=invalid), 0.8, allowed_tools=ALLOWED)
