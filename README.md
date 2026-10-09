@@ -692,3 +692,21 @@ Fine-tuned weights must be evaluated separately before any deployment.
 
 Related work: [multilingual benchmark #1](https://github.com/BelphegorPrime/ha-needle-llm/issues/1),
 [model evaluation and training #4](https://github.com/BelphegorPrime/ha-needle-llm/issues/4).
+
+## v0.6.1: deterministic no-action preflight
+
+Before either Needle route selection or the HA provider fallback can execute,
+the integration rejects **explicit prohibitions and counterfactual questions**
+in six languages (DE/EN/FR/ES/IT/NL). For example, requests to *not* start
+a timer, conditional questions about unlocking a door, and a command to
+operate an unsupported target instead of another device fail closed.
+
+This is a narrow linguistic backstop, **not a general intent recognizer**.
+Polite affirmative requests remain eligible for the standard pipeline.
+It never picks replacement targets, changes an action or relaxes confidence.
+The existing exact exposed entity match, native tool validation, suppression
+and minimum-confidence requirements still apply. A request not recognized by
+the preflight is **not automatically safe**.
+
+These rules are distinct from the Needle Trainer's offline benchmark and
+do not turn a NO_GO candidate into an approved production model.
