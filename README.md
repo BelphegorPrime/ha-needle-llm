@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.5.4
+0.5.5
 ```
 
 ## License
@@ -614,8 +614,8 @@ below the configured threshold. The configured threshold (default **0.80**)
 is never lowered.
 
 The already-configured HA model translates the original request into English
-through a **non-executable translation tool**. Exposed literal
-entity names are checked for preservation. Needle then receives the same real
+through a **non-executable translation tool**. Literal Assist-exposed entity names and Home Assistant area names are protected
+with opaque placeholders before translation, then strictly restored. Needle then receives the same real
 action alternatives and independently evaluates the translated request.
 Execution can continue only when the translated Needle result passes the
 original confidence threshold, chooses the **same** original action, contains
@@ -634,3 +634,17 @@ unchanged; the agreement checks reduce this risk but cannot eliminate it.
 Treat the mechanism as experimental. Test only harmless devices until a
 multilingual safety benchmark validates the behavior. Requests explicitly
 rejected by Needle's negation/grounding checks are never rescued.
+
+
+### v0.5.5: Protected identifiers during English fallback
+
+The translation fallback masks every whole-name mention of an exposed entity or
+registered Home Assistant area with an opaque token, e.g.
+`HA_LITERAL_0`, before asking the already configured HA model to translate.
+This also works when an entity label is a generic device-category word, such
+as `Licht`. The provider must preserve each token exactly once, and the router
+restores the original literal spelling before Needle's English verification.
+Dropped, duplicated or invented tokens fail closed. The original user
+utterance still drives final native Assist argument generation. The extra
+translation and verification call still occurs only after low-confidence
+agreement, and the original minimum confidence is never lowered.
