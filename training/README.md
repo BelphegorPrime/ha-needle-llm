@@ -28,17 +28,17 @@ data and require consent. No platform job is launched by these scripts.
 
 ## Curated training data
 
-`scenarios.json` has 36 distinct scenario groups, each explicitly labeled
+`scenarios.json` has 48 distinct scenario groups, each explicitly labeled
 for **German, English, French, Spanish, Italian and Dutch**. These produce
-216 reviewed/synthetic examples, including normal and safety-critical
+288 reviewed/synthetic examples, including normal and safety-critical
 positive commands, negation, status questions, ambiguous/hypothetical
 commands, doors versus lights, covers and timers.
 
-Splits are **scenario-group-disjoint**: 24 groups / 144 examples for training,
+Splits are **scenario-group-disjoint**: 36 groups / 216 examples for training,
 6 groups / 36 for validation and 6 groups / 36 for testing. Different-language
 translations of one scenario can never appear in a different split. These
-are *seed* examples, not a validated proof of language coverage and not yet
-the planned 200–500 **training** examples in #4. Expand with additional
+are *seed* examples, not a validated proof of language coverage and now a small curated start toward
+the planned 200–500 **training** examples in #4. Expand further with additional
 reviewed scenarios, not automatic paraphrases that leak across splits.
 
 The examples use the upstream Needle 3 `query`, `tools`, `answers`
@@ -182,8 +182,9 @@ safety evaluation is mandatory.
 
 ## Next steps and limitations
 
-1. Expand the training split to **200–500 reviewed training examples** with
-   additional scenario-disjoint negative and multilingual cases.
+1. Expand beyond the initial **216 reviewed training examples** with
+   additional scenario-disjoint negatives, mixed-language commands and
+   variation in actual Assist approval schemas.
 2. Collect a real **base model** benchmark on the **exact** production
    approval tool surface. Consider normalizations only if metrics warrant.
 3. Run low-priority local LoRA experiments off the HA server; use an
