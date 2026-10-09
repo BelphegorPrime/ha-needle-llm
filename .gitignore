@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Needle local model training: never commit data exports, weights or adapters
+/training/out/
+/training/cache/
+*.cact
+*.safetensors
