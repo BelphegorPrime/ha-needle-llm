@@ -550,3 +550,111 @@ async def test_english_retry_rejects_duplicate_protected_name() -> None:
     assert needle.async_complete.await_count == 1
     assert diagnostics["needle_approval"]["english_fallback"]["accepted"] is False
     assert "duplicated" in diagnostics["needle_approval"]["english_fallback"]["reason"]
+
+
+@pytest.mark.asyncio
+async def test_semantic_approval_aliases_map_back_to_native_tool() -> None:
+    """Needle approves simple action names; HA always executes native names."""
+    hass, context, needle, provider = _env()
+    titled_tools = [
+        {**tool, "title": "Turn off" if tool["name"].endswith("Off") else "Turn on"}
+        for tool in TOOLS
+    ]
+    needle.async_complete = AsyncMock(
+        return_value=(_needle_call("turn_on", confidence=0.94), {})
+    )
+    provider.async_complete = AsyncMock(
+        side_effect=[
+            (_model_call("intent__HassTurnOn"), {}),
+            (_model_call("intent__HassTurnOn", {
+                "area": "Wohnzimmer", "domain": ["light"]
+            }), {}),
+        ]
+    )
+    diagnostics: dict = {}
+    result = await async_provider_route(
+        hass=hass, context=context,
+        query="schalte licht im wohnzimmer ein",
+        tools=titled_tools,
+        needle=needle, provider=provider,
+        strategy=STRATEGY_MODEL_FIRST,
+        minimum_confidence=0.8,
+        diagnostics=diagnostics,
+    )
+    assert result.route.tool == "intent__HassTurnOn"
+    assert result.route.arguments == {
+        "area": "Wohnzimmer", "domain": ["light"]
+    }
+    approval = needle.async_complete.await_args.kwargs["tools"]
+    assert [tool["name"] for tool in approval] == ["turn_on", "turn_off"]
+    assert all(tool["parameters"] == {
+        "type": "object", "properties": {}
+    } for tool in approval)
+    assert diagnostics["needle_approval"]["function_calls"][0]["name"] == (
+        "intent__HassTurnOn"
+    )
+    assert diagnostics["needle_approval"]["approval_aliases"] == {
+        "turn_on": "intent__HassTurnOn",
+        "turn_off": "intent__HassTurnOff",
+    }
+
+
+@pytest.mark.asyncio
+async def test_semantic_approval_alias_disagreement_stays_blocked() -> None:
+    """A confident competing semantic alias is not an approval."""
+    hass, context, needle, provider = _env()
+    titled_tools = [
+        {**tool, "title": "Turn off" if tool["name"].endswith("Off") else "Turn on"}
+        for tool in TOOLS
+    ]
+    needle.async_complete = AsyncMock(
+        return_value=(_needle_call("turn_off", confidence=0.99), {})
+    )
+    provider.async_complete = AsyncMock(
+        return_value=(_model_call("intent__HassTurnOn"), {})
+    )
+    with pytest.raises(PipelineRejected, match="different native Assist"):
+        await async_provider_route(
+            hass=hass, context=context,
+            query="schalte licht im wohnzimmer ein",
+            tools=titled_tools,
+            needle=needle, provider=provider,
+            strategy=STRATEGY_MODEL_FIRST,
+            minimum_confidence=0.8,
+            diagnostics={},
+        )
+    assert provider.async_complete.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_semantic_approval_alias_low_confidence_stays_blocked() -> None:
+    """The semantic tool spelling must not bypass the 0.8 gate."""
+    hass, context, needle, provider = _env()
+    titled_tools = [
+        {**tool, "title": "Turn off" if tool["name"].endswith("Off") else "Turn on"}
+        for tool in TOOLS
+    ]
+    needle.async_complete = AsyncMock(
+        return_value=(_needle_call("turn_on", confidence=0.21), {})
+    )
+    provider.async_complete = AsyncMock(
+        side_effect=[
+            (_model_call("intent__HassTurnOn"), {}),
+            (_model_call("NeedleTranslateToEnglish", {
+                "english_query": "Turn on the lights in Wohnzimmer"
+            }), {}),
+        ]
+    )
+    diagnostics: dict = {}
+    with pytest.raises(PipelineRejected, match="below"):
+        await async_provider_route(
+            hass=hass, context=context,
+            query="schalte licht im wohnzimmer ein",
+            tools=titled_tools,
+            needle=needle, provider=provider,
+            strategy=STRATEGY_MODEL_FIRST,
+            minimum_confidence=0.8,
+            diagnostics=diagnostics,
+        )
+    assert provider.async_complete.await_count == 2
+    assert diagnostics["needle_approval"]["english_fallback"]["accepted"] is False
