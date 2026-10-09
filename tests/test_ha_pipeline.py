@@ -255,3 +255,168 @@ async def test_room_wide_request_uses_area_and_domain_not_invented_name() -> Non
         "area": "Wohnzimmer",
         "domain": ["light"],
     }
+
+
+@pytest.mark.asyncio
+async def test_low_confidence_agreement_recovers_after_english_approval() -> None:
+    """Original-language disagreement cannot be bypassed; agreement can retry."""
+    hass, context, needle, provider = _env()
+    needle.async_complete = AsyncMock(
+        side_effect=[
+            (_needle_call("intent__HassTurnOn", confidence=0.222), {}),
+            (_needle_call("intent__HassTurnOn", confidence=0.94), {}),
+        ]
+    )
+    provider.async_complete = AsyncMock(
+        side_effect=[
+            (_model_call("intent__HassTurnOn"), {}),
+            (
+                _model_call(
+                    "NeedleTranslateToEnglish",
+                    {"english_query": "Turn on the lights in Wohnzimmer"},
+                ),
+                {},
+            ),
+            (
+                _model_call(
+                    "intent__HassTurnOn",
+                    {"area": "Wohnzimmer", "domain": ["light"]},
+                ),
+                {},
+            ),
+        ]
+    )
+    diag: dict = {}
+    result = await async_provider_route(
+        hass=hass,
+        context=context,
+        query="schalte licht im wohnzimmer ein",
+        tools=TOOLS,
+        needle=needle,
+        provider=provider,
+        strategy=STRATEGY_MODEL_FIRST,
+        minimum_confidence=0.8,
+        diagnostics=diag,
+    )
+    assert result.route.tool == "intent__HassTurnOn"
+    assert result.route.arguments == {"area": "Wohnzimmer", "domain": ["light"]}
+    assert diag["needle_approval"]["confidence"] == 0.222
+    assert diag["needle_approval"]["english_fallback"]["accepted"] is True
+    assert diag["needle_approval"]["english_fallback"]["confidence"] == 0.94
+    assert needle.async_complete.await_args.kwargs["stage"] == "approval_english"
+    assert provider.async_complete.await_args.kwargs["query"] == (
+        "schalte licht im wohnzimmer ein"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "secondary_tool,confidence",
+    [
+        ("intent__HassTurnOff", 0.99),
+        ("intent__HassTurnOn", 0.55),
+    ],
+)
+async def test_english_fallback_rejects_conflicts_and_low_confidence(
+    secondary_tool: str, confidence: float
+) -> None:
+    """The translation is never a permission to bypass original safety."""
+    hass, context, needle, provider = _env()
+    needle.async_complete = AsyncMock(
+        side_effect=[
+            (_needle_call("intent__HassTurnOn", confidence=0.222), {}),
+            (_needle_call(secondary_tool, confidence=confidence), {}),
+        ]
+    )
+    provider.async_complete = AsyncMock(
+        side_effect=[
+            (_model_call("intent__HassTurnOn"), {}),
+            (
+                _model_call(
+                    "NeedleTranslateToEnglish",
+                    {"english_query": "Turn on the lights in Wohnzimmer"},
+                ),
+                {},
+            ),
+        ]
+    )
+    diagnostics: dict = {}
+    with pytest.raises(PipelineRejected, match="below"):
+        await async_provider_route(
+            hass=hass,
+            context=context,
+            query="schalte licht im wohnzimmer ein",
+            tools=TOOLS,
+            needle=needle,
+            provider=provider,
+            strategy=STRATEGY_MODEL_FIRST,
+            minimum_confidence=0.8,
+            diagnostics=diagnostics,
+        )
+    assert provider.async_complete.await_count == 2
+    assert diagnostics["needle_approval"]["english_fallback"]["accepted"] is False
+
+
+@pytest.mark.asyncio
+async def test_english_fallback_cannot_translate_exposed_names() -> None:
+    """Reject translation that renames an actual Assist-exposed entity."""
+    hass, context, needle, provider = _env()
+    hass.states.async_all.return_value = [
+        SimpleNamespace(
+            name="Wohnzimmerlampe",
+            entity_id="light.wohnzimmer",
+        ),
+    ]
+    needle.async_complete = AsyncMock(
+        return_value=(_needle_call("intent__HassTurnOn", confidence=0.222), {})
+    )
+    provider.async_complete = AsyncMock(
+        side_effect=[
+            (_model_call("intent__HassTurnOn"), {}),
+            (
+                _model_call(
+                    "NeedleTranslateToEnglish",
+                    {"english_query": "Turn on the living room lamp"},
+                ),
+                {},
+            ),
+        ]
+    )
+    with pytest.raises(PipelineRejected, match="below"):
+        await async_provider_route(
+            hass=hass,
+            context=context,
+            query="schalte die Wohnzimmerlampe ein",
+            tools=TOOLS,
+            needle=needle,
+            provider=provider,
+            strategy=STRATEGY_MODEL_FIRST,
+            minimum_confidence=0.8,
+            diagnostics={},
+        )
+    needle.async_complete.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_explicit_needle_negation_never_triggers_translation() -> None:
+    """Never use translated text to override an explicit native refusal."""
+    hass, context, needle, provider = _env()
+    negative = _needle_call("intent__HassTurnOn", confidence=0.222)
+    negative["validation"]["negation"] = True
+    needle.async_complete = AsyncMock(return_value=(negative, {}))
+    provider.async_complete = AsyncMock(
+        return_value=(_model_call("intent__HassTurnOn"), {})
+    )
+    with pytest.raises(PipelineRejected):
+        await async_provider_route(
+            hass=hass,
+            context=context,
+            query="schalte licht nicht ein",
+            tools=TOOLS,
+            needle=needle,
+            provider=provider,
+            strategy=STRATEGY_MODEL_FIRST,
+            minimum_confidence=0.8,
+            diagnostics={},
+        )
+    assert provider.async_complete.await_count == 1
