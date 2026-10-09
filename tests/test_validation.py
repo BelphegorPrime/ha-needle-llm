@@ -4,9 +4,9 @@ import pytest
 
 from custom_components.needle_llm.routing import (
     build_approval_tools,
-    build_semantic_approval_tools,
     build_discovery_tools,
     build_routing_query,
+    build_semantic_approval_tools,
     candidate_tool_names,
     execution_tool,
 )
@@ -518,8 +518,10 @@ def test_approval_description_avoids_duplicate_title() -> None:
 def test_semantic_approval_aliases_use_real_native_titles() -> None:
     """Keep independent alternatives and map semantic names to native tools."""
     tools = [
-        {"name": "intent__HassTurnOn", "title": "Turn on", "description": "Turn on devices"},
-        {"name": "intent__HassTurnOff", "title": "Turn off", "description": "Turn off devices"},
+        {"name": "intent__HassTurnOn", "title": "Turn on",
+         "description": "Turn on devices"},
+        {"name": "intent__HassTurnOff", "title": "Turn off",
+         "description": "Turn off devices"},
     ]
     aliased, mapping = build_semantic_approval_tools(
         tools, "intent__HassTurnOn"
