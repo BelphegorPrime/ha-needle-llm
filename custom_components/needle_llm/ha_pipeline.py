@@ -14,7 +14,7 @@ from homeassistant.helpers import area_registry, llm
 from .client import NeedleClient, NeedleClientError
 from .ha_provider import HomeAssistantModelProvider, ProviderError
 from .routing import (
-    build_approval_tools,
+    build_semantic_approval_tools,
     build_discovery_tools,
     build_routing_query,
     candidate_tool_names,
@@ -96,6 +96,19 @@ def _literal_names_for_translation(
     return names
 
 
+def _native_approval_calls(
+    calls: Any, aliases: dict[str, str]
+) -> Any:
+    """Present real HA names in diagnostics; validate raw aliases separately."""
+    if not isinstance(calls, list):
+        return calls
+    return [
+        {**call, "name": aliases.get(call.get("name"), call.get("name"))}
+        if isinstance(call, dict) else call
+        for call in calls
+    ]
+
+
 async def async_provider_route(
     *,
     hass: HomeAssistant,
@@ -173,11 +186,18 @@ async def async_provider_route(
             )
         tentative = candidates[0]
 
-    approval_tools = build_approval_tools(tools, tentative)
+    approval_tools, approval_aliases = build_semantic_approval_tools(
+        tools, tentative
+    )
     if not approval_tools:
         raise PipelineRejected(
             "needle_approval", "Selected action is no longer available"
         )
+
+    proposed_alias = next(
+        alias for alias, original in approval_aliases.items()
+        if original == tentative
+    )
 
     # Approve the original request against real alternatives. Do not send
     # optional argument examples or full parameter schemas in this pass.
@@ -192,14 +212,19 @@ async def async_provider_route(
 
     diagnostics["needle_approval"] = {
         "candidate": tentative,
-        "candidate_tools": [tool["name"] for tool in approval_tools],
+        "candidate_tools": list(approval_aliases.values()),
+        "approval_aliases": approval_aliases,
         "candidate_tool_count": len(approval_tools),
         "query_mode": "original_user_request",
         "transport": verification_transport,
         "confidence": verification.get("confidence"),
         "reasoning": verification.get("reasoning"),
-        "function_calls": verification.get("function_calls", []),
-        "suppressed_calls": verification.get("suppressed_calls", []),
+        "function_calls": _native_approval_calls(
+            verification.get("function_calls", []), approval_aliases
+        ),
+        "suppressed_calls": _native_approval_calls(
+            verification.get("suppressed_calls", []), approval_aliases
+        ),
         "validation": verification.get("validation", {}),
     }
 
@@ -212,7 +237,7 @@ async def async_provider_route(
         and isinstance(first_calls, list)
         and len(first_calls) == 1
         and isinstance(first_calls[0], dict)
-        and first_calls[0].get("name") == tentative
+        and first_calls[0].get("name") == proposed_alias
         and first_calls[0].get("arguments") == {}
         and not verification.get("suppressed_calls")
         and isinstance(verification.get("validation"), dict)
@@ -291,14 +316,16 @@ async def async_provider_route(
             fallback["english_query"] = english
             fallback["needle_transport"] = second_transport
             fallback["confidence"] = second.get("confidence")
-            fallback["selected_calls"] = second.get("function_calls", [])
+            fallback["selected_calls"] = _native_approval_calls(
+                second.get("function_calls", []), approval_aliases
+            )
             fallback["validation"] = second.get("validation", {})
             second_approved = approve_route(
                 second,
                 minimum_confidence,
-                allowed_tools={tool["name"] for tool in approval_tools},
+                allowed_tools=set(approval_aliases),
             )
-            if second_approved.tool != tentative or second_approved.arguments:
+            if second_approved.tool != proposed_alias or second_approved.arguments:
                 raise RouteRejected("English approval disagreed with original action")
             if second.get("suppressed_calls"):
                 raise RouteRejected(
@@ -311,7 +338,9 @@ async def async_provider_route(
             initial_approval["original_confidence"] = original_confidence
             initial_approval["confidence"] = second_approved.confidence
             initial_approval["reasoning"] = second.get("reasoning")
-            initial_approval["function_calls"] = second.get("function_calls", [])
+            initial_approval["function_calls"] = _native_approval_calls(
+                second.get("function_calls", []), approval_aliases
+            )
             initial_approval["validation"] = second.get("validation", {})
         except (
             ProviderError,
@@ -325,7 +354,7 @@ async def async_provider_route(
         approved = approve_route(
             verification,
             minimum_confidence,
-            allowed_tools={tool["name"] for tool in approval_tools},
+            allowed_tools=set(approval_aliases),
         )
     except RouteRejected as err:
         reason = str(err)
@@ -340,7 +369,7 @@ async def async_provider_route(
             and isinstance(calls, list)
             and len(calls) == 1
             and isinstance(calls[0], dict)
-            and calls[0].get("name") == tentative
+            and calls[0].get("name") == proposed_alias
         ):
             diagnostics["needle_approval"]["agreed_but_low_confidence"] = True
             reason = (
@@ -351,7 +380,7 @@ async def async_provider_route(
             )
         raise PipelineRejected("needle_approval", reason) from err
 
-    if approved.tool != tentative:
+    if approved.tool != proposed_alias:
         raise PipelineRejected(
             "needle_approval",
             "Needle selected a different native Assist action than the "
@@ -364,6 +393,14 @@ async def async_provider_route(
             "needle_approval",
             "Needle returned unexpected arguments while approving an action",
         )
+
+    # The alias is only a semantic presentation. Convert a validated vote
+    # back to exactly one native Assist tool; no alias is ever executed.
+    approved = ApprovedRoute(
+        tool=approval_aliases[approved.tool],
+        arguments=approved.arguments,
+        confidence=approved.confidence,
+    )
 
     matched_target = _exposed_target(hass, query, context.assistant)
     native = tools_by_name[approved.tool]
