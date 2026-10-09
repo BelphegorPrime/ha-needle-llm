@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Any
@@ -39,6 +40,9 @@ def approve_route(
         confidence = float(result.get("confidence"))
     except (TypeError, ValueError) as err:
         raise RouteRejected("Needle did not return a confidence value") from err
+
+    if not math.isfinite(confidence) or not 0 <= confidence <= 1:
+        raise RouteRejected("Needle returned an invalid confidence value")
 
     if confidence < minimum_confidence:
         raise RouteRejected(
