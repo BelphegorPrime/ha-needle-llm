@@ -51,6 +51,12 @@ jobs:
       - name: Ruff
         run: ruff check .
 
+      - name: Validate resource-limited training launcher
+        run: bash -n training/run_low_priority.sh
+
+      - name: Validate multilingual training data export
+        run: python training/workflow.py prepare --output "${RUNNER_TEMP}/needle-training"
+
       - name: Tests
         run: pytest
 
