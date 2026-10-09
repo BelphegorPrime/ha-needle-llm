@@ -20,6 +20,7 @@ from .routing import (
     candidate_tool_names,
     execution_tool,
 )
+from .request_guard import no_action_reason
 from .target_guard import find_unique_mentioned_entity
 from .translation import (
     TranslationRejected,
@@ -127,6 +128,10 @@ async def async_provider_route(
     entire native discovery surface and must independently agree with the
     preselected action at the configured confidence threshold.
     """
+    blocked = no_action_reason(query)
+    if blocked is not None:
+        raise PipelineRejected("request_guard", blocked)
+
     if strategy not in STRATEGIES:
         raise PipelineRejected("configuration", "Unknown routing strategy")
 
