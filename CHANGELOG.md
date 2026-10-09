@@ -3,7 +3,7 @@
 ## 0.6.0 - 2026-10-09
 
 - Add a fully synthetic multilingual Needle 3 action-approval training dataset:
-  36 scenario-disjoint groups / 216 seed examples across DE, EN, FR, ES,
+  48 scenario-disjoint groups / 288 seed examples across DE, EN, FR, ES,
   IT and NL, including negative and safety-critical controls.
 - Add deterministic offline preparation and scoring, a serial rate-limited,
   read-only live Needle benchmark and fail-closed baseline comparison.
