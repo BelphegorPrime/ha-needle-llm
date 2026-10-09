@@ -44,8 +44,15 @@ def _model_call(name: str, args: dict | None = None) -> dict:
 
 
 def _needle_call(
-    name: str, *, confidence: float = 0.97
+    name: str, *, confidence: float = 0.97, approval: bool = True
 ) -> dict:
+    if approval:
+        # Only independent approval sees semantic aliases. Discovery still
+        # uses the native Home Assistant tool names.
+        name = {
+            "intent__HassTurnOn": "turn_on",
+            "intent__HassTurnOff": "turn_off",
+        }.get(name, name)
     return {
         "success": True,
         "confidence": confidence,
@@ -93,7 +100,7 @@ async def test_provider_requires_independent_needle_approval(strategy: str) -> N
     selected = "intent__HassTurnOff"
     needle.async_complete = AsyncMock(
         side_effect=[
-            (_needle_call(selected), {"complete_ms": 8}),
+            (_needle_call(selected, approval=False), {"complete_ms": 8}),
             (_needle_call(selected), {"complete_ms": 9}),
         ]
         if strategy == STRATEGY_NEEDLE_FIRST
@@ -554,12 +561,8 @@ async def test_english_retry_rejects_duplicate_protected_name() -> None:
 
 @pytest.mark.asyncio
 async def test_semantic_approval_aliases_map_back_to_native_tool() -> None:
-    """Needle approves simple action names; HA always executes native names."""
+    """Title-less native Assist tools use safe action aliases too."""
     hass, context, needle, provider = _env()
-    titled_tools = [
-        {**tool, "title": "Turn off" if tool["name"].endswith("Off") else "Turn on"}
-        for tool in TOOLS
-    ]
     needle.async_complete = AsyncMock(
         return_value=(_needle_call("turn_on", confidence=0.94), {})
     )
@@ -575,7 +578,7 @@ async def test_semantic_approval_aliases_map_back_to_native_tool() -> None:
     result = await async_provider_route(
         hass=hass, context=context,
         query="schalte licht im wohnzimmer ein",
-        tools=titled_tools,
+        tools=TOOLS,
         needle=needle, provider=provider,
         strategy=STRATEGY_MODEL_FIRST,
         minimum_confidence=0.8,
