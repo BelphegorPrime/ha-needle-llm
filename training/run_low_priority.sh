@@ -97,9 +97,18 @@ if [[ "${mode}" == build ]]; then
     { echo "Missing ${adapter}: train first." >&2; exit 2; }
 fi
 
+# The Needle 3.1.3 build command forces a Hugging Face base-archive
+# download. Only the explicitly requested experimental build gets network
+# access; actual training remains fully offline.
+network_mode=none
+if [[ "${mode}" == build ]]; then
+  network_mode=bridge
+  echo "Experimental build may download the public Needle base archive." >&2
+fi
+
 args=(
   run --rm --init --name "needle-quiet-train-$$"
-  --network none
+  --network "${network_mode}"
   --cpus "${cpus}"
   --cpu-shares 128
   --memory "${memory_gib}g"
@@ -130,7 +139,7 @@ args=(
 if [[ -n "${cpuset}" ]]; then
   args+=(--cpuset-cpus "${cpuset}")
 fi
-echo "Starting CPU-only ${mode} with max ${cpus} CPU(s), ${memory_gib} GiB RAM, no swap/network."
+echo "Starting CPU-only ${mode} with max ${cpus} CPU(s), ${memory_gib} GiB RAM, no swap (network: ${network_mode})."
 echo "Training may be VERY slow; if memory exceeds its limit, Docker kills only this container."
 if [[ "${mode}" == train ]]; then
   exec docker "${args[@]}" ha-needle-trainer:3.1.3 \
