@@ -128,6 +128,39 @@ def build_routing_trace(
             )
         )
 
+    if isinstance(approval := diagnostics.get("needle_approval"), dict):
+        fallback = approval.get("english_fallback")
+        if isinstance(fallback, dict) and fallback.get("attempted"):
+            translation_ms = _latency({
+                "transport": fallback.get("translation_transport")
+            })
+            needle_ms = _latency({
+                "transport": fallback.get("needle_transport")
+            })
+            durations = [
+                value for value in (translation_ms, needle_ms)
+                if value is not None
+            ]
+            steps.append(
+                _stage(
+                    "english_approval_retry",
+                    status=(
+                        "approved" if fallback.get("accepted")
+                        else "rejected"
+                    ),
+                    duration_ms=round(sum(durations), 1)
+                    if durations else None,
+                    extra={
+                        "original_confidence": approval.get(
+                            "original_confidence", approval.get("confidence")
+                        ),
+                        "retry_confidence": fallback.get("confidence"),
+                        "reason": fallback.get("reason"),
+                        "candidate_tools": approval.get("candidate_tools"),
+                    },
+                )
+            )
+
     if isinstance(route := diagnostics.get("route"), dict):
         tool_calls = route.get("tool_calls")
         needle = route.get("needle")
