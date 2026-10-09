@@ -235,7 +235,7 @@ async def async_provider_route(
             # of literal HA target names to a new spelling.
             if not isinstance(english, str) or not (
                 0 < len(english.strip()) <= 1000
-            ) or "\\n" in english or "\\r" in english:
+            ) or "\n" in english or "\r" in english:
                 raise RouteRejected("Invalid English normalization")
             english = english.strip()
             # The fallback is for language normalization, not rewriting
@@ -253,7 +253,7 @@ async def async_provider_route(
                 name = state.name
                 if not isinstance(name, str) or not name.strip():
                     continue
-                pattern = r"(?<!\\w)" + re.escape(name) + r"(?!\\w)"
+                pattern = r"(?<!\w)" + re.escape(name) + r"(?!\w)"
                 if re.search(pattern, query, re.I) and not re.search(
                     pattern, english, re.I
                 ):
