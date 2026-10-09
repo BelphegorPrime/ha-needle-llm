@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.6 - 2026-10-09
+
+- For provider-backed routing, expose short action aliases derived from the
+  installed native Assist tool titles (e.g. `turn_on` and `turn_off`) during
+  Needle's independent approval instead of opaque native function names.
+- Reverse-map *only validated* aliases to the unchanged native Assist tools.
+  Keep real competing choices, empty approval arguments and the minimum
+  confidence gate at 0.8; an alias is never directly executed.
+- Retain native action names in diagnostics and show the English retry stage
+  with its full observed latency and confidence in routing traces.
+- Harden Needle confidence validation against NaN, infinity and out-of-range
+  values. Add regression tests for alias collisions and disagreements.
+- This is a schema-quality improvement, not proof that a stock Needle model
+  can reach a 0.8 confidence threshold. Measure on the actual model before
+  considering retraining or a revised threshold.
+
 ## 0.5.5 - 2026-10-09
 
 - Fix the v0.5.4 English approval fallback rejecting valid translations when a
