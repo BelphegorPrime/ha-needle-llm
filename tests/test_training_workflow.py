@@ -22,7 +22,7 @@ DATASET = Path(__file__).resolve().parents[1] / "training" / "scenarios.json"
 
 def test_multilingual_scenario_disjoint_corpus() -> None:
     scenarios = load_scenarios(DATASET)
-    assert len(scenarios) == 36
+    assert len(scenarios) == 48
     assert set(LANGUAGES) == {"de", "en", "fr", "es", "it", "nl"}
     groups = {}
     for split in ("train", "validation", "test"):
@@ -40,7 +40,7 @@ def test_multilingual_scenario_disjoint_corpus() -> None:
     assert not groups["train"] & groups["validation"]
     assert not groups["train"] & groups["test"]
     assert not groups["validation"] & groups["test"]
-    assert len(prepared_rows(scenarios, "train")) == 144
+    assert len(prepared_rows(scenarios, "train")) == 216
     assert len(prepared_rows(scenarios, "validation")) == 36
     assert len(prepared_rows(scenarios, "test")) == 36
 
