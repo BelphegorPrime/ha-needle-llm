@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.7 - 2026-10-09
+
+- Fix a regression in v0.5.6 where real Home Assistant Assist tools lacking
+  a `title` were still sent to Needle with opaque names such as
+  `intent__HassTurnOn` instead of readable approval aliases.
+- When there is no usable title, split the actual native function's CamelCase
+  action suffix and omit a common action namespace from comparable tools
+  (e.g. `HassTurnOn` / `HassTurnOff` becomes `turn_on` / `turn_off`).
+  The mapping is derived from the active Assist tools, never a hard-coded
+  list of languages, entities or devices.
+- Preserve unique, reversible alias mappings and fail closed on collisions;
+  only validated Needle approvals can map back to native HA tool names.
+- Clarify low-confidence failures when the native model and Needle agree:
+  no Home Assistant target lookup occurred, and a specific device name
+  should not be demanded merely because Needle's score was low.
+- Add regression tests based on title-less native tool shapes.
+- Confidence threshold remains unchanged; improved aliases do not promise
+  a higher model confidence score.
+
 ## 0.5.6 - 2026-10-09
 
 - For provider-backed routing, expose short action aliases derived from the
