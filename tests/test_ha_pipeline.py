@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -427,3 +427,126 @@ async def test_explicit_needle_negation_never_triggers_translation() -> None:
             diagnostics={},
         )
     assert provider.async_complete.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_english_retry_protects_real_entity_and_area_names() -> None:
+    """Reproduce v0.5.4: 'Licht' is also an exposed entity name."""
+    hass, context, needle, provider = _env()
+    context.language = "en"  # Mirrors the actual trace despite German input.
+    hass.states.async_all.return_value = [
+        SimpleNamespace(
+            name="Licht",
+            entity_id="light.licht",
+            attributes={},
+        )
+    ]
+    needle.async_complete = AsyncMock(
+        side_effect=[
+            (_needle_call("intent__HassTurnOn", confidence=0.2201), {}),
+            (_needle_call("intent__HassTurnOn", confidence=0.95), {}),
+        ]
+    )
+    provider.async_complete = AsyncMock(
+        side_effect=[
+            (_model_call("intent__HassTurnOn"), {}),
+            (
+                _model_call(
+                    "NeedleTranslateToEnglish",
+                    {"english_query": "Turn on HA_LITERAL_0 in HA_LITERAL_1"},
+                ),
+                {},
+            ),
+            (
+                _model_call(
+                    "intent__HassTurnOn",
+                    {"area": "wohnzimmer", "domain": ["light"]},
+                ),
+                {},
+            ),
+        ]
+    )
+    diagnostics: dict = {}
+    with (
+        patch(
+            "custom_components.needle_llm.ha_pipeline.async_should_expose",
+            return_value=True,
+        ),
+        patch(
+            "custom_components.needle_llm.ha_pipeline.area_registry.async_get"
+        ) as get_areas,
+    ):
+        get_areas.return_value.async_list_areas.return_value = [
+            SimpleNamespace(name="Wohnzimmer")
+        ]
+        result = await async_provider_route(
+            hass=hass,
+            context=context,
+            query="schalte licht im wohnzimmer ein",
+            tools=TOOLS,
+            needle=needle,
+            provider=provider,
+            strategy=STRATEGY_MODEL_FIRST,
+            minimum_confidence=0.8,
+            diagnostics=diagnostics,
+        )
+
+    translation_request = provider.async_complete.await_args_list[1].kwargs
+    assert translation_request["query"] == (
+        "schalte HA_LITERAL_0 im HA_LITERAL_1 ein"
+    )
+    assert needle.async_complete.await_args_list[1].kwargs["query"] == (
+        "Turn on licht in wohnzimmer"
+    )
+    assert result.route.tool == "intent__HassTurnOn"
+    assert result.route.arguments == {
+        "area": "wohnzimmer", "domain": ["light"]
+    }
+    fallback = diagnostics["needle_approval"]["english_fallback"]
+    assert fallback["accepted"] is True
+    assert fallback["protected_name_count"] == 2
+    assert fallback["english_query"] == "Turn on licht in wohnzimmer"
+
+
+@pytest.mark.asyncio
+async def test_english_retry_rejects_duplicate_protected_name() -> None:
+    """Cannot repeat a Home Assistant name during translation."""
+    hass, context, needle, provider = _env()
+    hass.states.async_all.return_value = [
+        SimpleNamespace(name="Licht", entity_id="light.licht", attributes={})
+    ]
+    needle.async_complete = AsyncMock(
+        return_value=(_needle_call("intent__HassTurnOn", confidence=0.22), {})
+    )
+    provider.async_complete = AsyncMock(
+        side_effect=[
+            (_model_call("intent__HassTurnOn"), {}),
+            (
+                _model_call(
+                    "NeedleTranslateToEnglish",
+                    {"english_query": "Turn on HA_LITERAL_0 and HA_LITERAL_0"},
+                ),
+                {},
+            ),
+        ]
+    )
+    diagnostics: dict = {}
+    with patch(
+        "custom_components.needle_llm.ha_pipeline.async_should_expose",
+        return_value=True,
+    ):
+        with pytest.raises(PipelineRejected, match="below"):
+            await async_provider_route(
+                hass=hass,
+                context=context,
+                query="schalte licht ein",
+                tools=TOOLS,
+                needle=needle,
+                provider=provider,
+                strategy=STRATEGY_MODEL_FIRST,
+                minimum_confidence=0.8,
+                diagnostics=diagnostics,
+            )
+    assert needle.async_complete.await_count == 1
+    assert diagnostics["needle_approval"]["english_fallback"]["accepted"] is False
+    assert "duplicated" in diagnostics["needle_approval"]["english_fallback"]["reason"]
