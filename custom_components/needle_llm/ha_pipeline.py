@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any
 
 from homeassistant.components.homeassistant.exposed_entities import (
@@ -177,6 +178,109 @@ async def async_provider_route(
         "validation": verification.get("validation", {}),
     }
 
+    # An English fallback is allowed only after Needle independently agreed
+    # with the original operation. Never replace an explicit refusal.
+    initial_approval = diagnostics["needle_approval"]
+    first_calls = verification.get("function_calls")
+    original_agreement = (
+        verification.get("success") is True
+        and isinstance(first_calls, list)
+        and len(first_calls) == 1
+        and isinstance(first_calls[0], dict)
+        and first_calls[0].get("name") == tentative
+        and first_calls[0].get("arguments") == {}
+        and not verification.get("suppressed_calls")
+        and isinstance(verification.get("validation"), dict)
+        and not verification["validation"].get("ungrounded")
+        and verification["validation"].get("negation") is not True
+    )
+    try:
+        original_confidence = float(verification.get("confidence"))
+    except (TypeError, ValueError):
+        original_confidence = -1.0
+
+    if original_agreement and 0 <= original_confidence < minimum_confidence:
+        # Translate only an action description. No translated arguments can
+        # reach HA. The provider's tool call is validated before use.
+        translation_tool = {
+            "name": "NeedleTranslateToEnglish",
+            "description": (
+                "Translate the original request into English without changing "
+                "actions, negation, scope, or literal Home Assistant names."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "english_query": {"type": "string"},
+                },
+                "required": ["english_query"],
+                "additionalProperties": False,
+            },
+        }
+        fallback = {"attempted": True, "accepted": False}
+        initial_approval["english_fallback"] = fallback
+        try:
+            translated, translation_transport = await provider.async_complete(
+                tools=[translation_tool],
+                query=query,
+                language=context.language,
+                stage="approval_translation",
+            )
+            fallback["translation_transport"] = translation_transport
+            translation_call = approve_openai_route(
+                translated, allowed_tools={"NeedleTranslateToEnglish"}
+            )
+            english = translation_call.arguments.get("english_query")
+            # A bounded single-line request, with no unsafe translation
+            # of literal HA target names to a new spelling.
+            if not isinstance(english, str) or not (
+                0 < len(english.strip()) <= 1000
+            ) or "\\n" in english or "\\r" in english:
+                raise RouteRejected("Invalid English normalization")
+            english = english.strip()
+            # The fallback is for language normalization, not rewriting
+            # already-English inputs. Never use it to rescue a refusal.
+            if english.casefold() == query.strip().casefold():
+                raise RouteRejected("English normalization did not change the request")
+            # Names are literal HA identifiers, regardless of locale.
+            for state in hass.states.async_all():
+                if not async_should_expose(hass, context.assistant, state.entity_id):
+                    continue
+                name = state.name
+                if not isinstance(name, str) or not name.strip():
+                    continue
+                if re.search(r"(?<!\\w)" + re.escape(name) + r"(?!\\w)", query, re.I):
+                    if not re.search(r"(?<!\\w)" + re.escape(name) + r"(?!\\w)", english, re.I):
+                        raise RouteRejected("English normalization changed an exposed entity name")
+            # Do not let the translation suppress a negation in the original.
+            # In all cases Needle must still choose the same action with the
+            # configured minimum confidence, and with no argument payload.
+            second, second_transport = await needle.async_complete(
+                tools=approval_tools,
+                query=english,
+                stage="approval_english",
+            )
+            fallback["english_query"] = english
+            fallback["needle_transport"] = second_transport
+            fallback["confidence"] = second.get("confidence")
+            fallback["selected_calls"] = second.get("function_calls", [])
+            fallback["validation"] = second.get("validation", {})
+            second_approved = approve_route(
+                second,
+                minimum_confidence,
+                allowed_tools={tool["name"] for tool in approval_tools},
+            )
+            if second_approved.tool != tentative or second_approved.arguments:
+                raise RouteRejected("English approval disagreed with original action")
+            if second.get("suppressed_calls"):
+                raise RouteRejected("English approval contained suppressed calls")
+            # Retain both decisions in diagnostics and the original request
+            # for final argument generation; never copy translated arguments.
+            verification = second
+            fallback["accepted"] = True
+        except (ProviderError, NeedleClientError, RouteRejected) as err:
+            fallback["reason"] = str(err)
+
     try:
         approved = approve_route(
             verification,
@@ -189,7 +293,8 @@ async def async_provider_route(
         # confidence gate still decides whether execution may proceed.
         calls = verification.get("function_calls")
         if (
-            reason.startswith("Needle confidence ")
+            not diagnostics["needle_approval"].get("english_fallback", {}).get("accepted")
+            and reason.startswith("Needle confidence ")
             and isinstance(calls, list)
             and len(calls) == 1
             and isinstance(calls[0], dict)
