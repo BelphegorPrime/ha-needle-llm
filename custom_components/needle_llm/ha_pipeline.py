@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,7 +9,7 @@ from homeassistant.components.homeassistant.exposed_entities import (
     async_should_expose,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import llm
+from homeassistant.helpers import area_registry, llm
 
 from .client import NeedleClient, NeedleClientError
 from .ha_provider import HomeAssistantModelProvider, ProviderError
@@ -22,6 +21,11 @@ from .routing import (
     execution_tool,
 )
 from .target_guard import find_unique_mentioned_entity
+from .translation import (
+    TranslationRejected,
+    mask_literal_names,
+    restore_literal_names,
+)
 from .validation import (
     ApprovedRoute,
     RouteRejected,
@@ -69,6 +73,27 @@ def _exposed_target(
             }
         )
     return find_unique_mentioned_entity(query, entities)
+
+
+def _literal_names_for_translation(
+    hass: HomeAssistant, assistant: str
+) -> list[str]:
+    """Collect only real exposed entity and area labels for masking."""
+    names = [
+        state.name
+        for state in hass.states.async_all()
+        if async_should_expose(hass, assistant, state.entity_id)
+        and isinstance(state.name, str)
+    ]
+    # An area label is a literal HA identifier, even when there is no
+    # exposed entity with that name. Keep the room name unchanged.
+    registry = area_registry.async_get(hass)
+    names.extend(
+        area.name
+        for area in registry.async_list_areas()
+        if isinstance(area.name, str)
+    )
+    return names
 
 
 async def async_provider_route(
@@ -220,9 +245,17 @@ async def async_provider_route(
         fallback = {"attempted": True, "accepted": False}
         initial_approval["english_fallback"] = fallback
         try:
+            # Mask exposed entity and actual area names *before* translation.
+            # A generic word such as "Licht" may also be an entity label.
+            # Merely checking that word after translation would reject a
+            # legitimate "Licht" -> "lights" translation (v0.5.4 bug).
+            masked_query, protected = mask_literal_names(
+                query, _literal_names_for_translation(hass, context.assistant)
+            )
+            fallback["protected_name_count"] = len(protected)
             translated, translation_transport = await provider.async_complete(
                 tools=[translation_tool],
-                query=query,
+                query=masked_query,
                 language=context.language,
                 stage="approval_translation",
             )
@@ -238,28 +271,15 @@ async def async_provider_route(
             ) or "\n" in english or "\r" in english:
                 raise RouteRejected("Invalid English normalization")
             english = english.strip()
-            # The fallback is for language normalization, not rewriting
-            # already-English inputs. Never use it to rescue a refusal.
+            # The translation is for action approval only, never for
+            # generating Home Assistant arguments or entity names.
+            # Names are restored exactly as spoken by the user. A missing,
+            # renamed, duplicated or invented placeholder fails closed.
+            english = restore_literal_names(english, protected)
             if english.casefold() == query.strip().casefold():
                 raise RouteRejected(
                     "English normalization did not change the request"
                 )
-            # Names are literal HA identifiers, regardless of locale.
-            for state in hass.states.async_all():
-                if not async_should_expose(
-                    hass, context.assistant, state.entity_id
-                ):
-                    continue
-                name = state.name
-                if not isinstance(name, str) or not name.strip():
-                    continue
-                pattern = r"(?<!\w)" + re.escape(name) + r"(?!\w)"
-                if re.search(pattern, query, re.I) and not re.search(
-                    pattern, english, re.I
-                ):
-                    raise RouteRejected(
-                        "English normalization changed an exposed entity name"
-                    )
             # Do not let the translation suppress a negation in the original.
             # In all cases Needle must still choose the same action with the
             # configured minimum confidence, and with no argument payload.
@@ -293,7 +313,12 @@ async def async_provider_route(
             initial_approval["reasoning"] = second.get("reasoning")
             initial_approval["function_calls"] = second.get("function_calls", [])
             initial_approval["validation"] = second.get("validation", {})
-        except (ProviderError, NeedleClientError, RouteRejected) as err:
+        except (
+            ProviderError,
+            NeedleClientError,
+            RouteRejected,
+            TranslationRejected,
+        ) as err:
             fallback["reason"] = str(err)
 
     try:
