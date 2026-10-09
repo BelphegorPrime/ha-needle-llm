@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.5.5
+0.5.6
 ```
 
 ## License
@@ -648,3 +648,29 @@ Dropped, duplicated or invented tokens fail closed. The original user
 utterance still drives final native Assist argument generation. The extra
 translation and verification call still occurs only after low-confidence
 agreement, and the original minimum confidence is never lowered.
+
+
+### v0.5.6: Semantic Needle approval aliases
+
+In the **Needle + existing HA model** mode, the independent Needle approval
+stage presents native Assist operations under concise, human-readable function
+aliases derived from the installed tool titles. For instance,
+`intent__HassTurnOn` and `intent__HassTurnOff` are compared as `turn_on`
+and `turn_off`. The source tool descriptions and real alternatives remain
+intact. This is an experimental attempt to make Needle's byte-level tool
+decoding more aligned with natural-language command semantics.
+
+Aliases are unique and reversible. Colliding or missing native titles fall
+back to their real names, and **only Needle-approved aliases are mapped back
+to native Assist**. No alias is executed as a Home Assistant tool. The
+independent selection, 0.8 confidence check, validation and literal user
+request used for target argument extraction are unchanged.
+
+**Note:** A more readable tool name may improve decoding confidence, but it
+cannot guarantee a higher value from Needle's separate calibration head. If
+v0.5.6 still rejects a simple command, that is evidence the current Needle
+model/confidence calibration is unsuitable for the schema. Do not lower the
+gate blindly. Measure examples with the exact server/tool descriptions,
+consider a confidence-preserving platform fine-tune, or use an explicit user
+confirmation flow. A local Needle 3 LoRA build can omit the confidence head,
+and this integration intentionally rejects missing confidence values.
