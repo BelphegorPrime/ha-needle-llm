@@ -595,7 +595,9 @@ def test_native_aliases_keep_unique_action_when_namespaces_differ() -> None:
         tools, "media__PlayMedia"
     )
     assert set(mapping.values()) == set(tool["name"] for tool in tools)
-    assert result[0]["name"] == "play_media"
+    assert [tool["name"] for tool in result] == [
+        "hass_turn_on", "play_media"
+    ]
 
 
 def test_native_aliases_safely_fall_back_on_collisions() -> None:
