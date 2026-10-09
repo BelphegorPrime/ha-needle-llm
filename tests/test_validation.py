@@ -3,6 +3,7 @@
 import pytest
 
 from custom_components.needle_llm.routing import (
+    build_approval_tools,
     build_discovery_tools,
     build_routing_query,
     candidate_tool_names,
@@ -392,3 +393,41 @@ def test_similar_or_ambiguous_exposed_names_are_not_unique() -> None:
     assert find_unique_mentioned_entity(
         "Öffne Tor und Einfahrtstor", entities
     ) is None
+
+
+def test_approval_tools_include_alternatives_without_schema_fields() -> None:
+    """Approval should compare actions, not hallucinate optional settings."""
+    tools = [
+        {"name": "intent__HassTurnOn", "title": "Turn on",
+         "description": "Turn on devices",
+         "parameters": {"properties": {"area": {}, "domain": {}}}},
+        {"name": "intent__HassTurnOff", "title": "Turn off",
+         "description": "Turn off devices",
+         "parameters": {"properties": {"area": {}, "domain": {}}}},
+        {"name": "media_player__HassMediaNext", "title": "Next",
+         "description": "Play next item", "parameters": {}},
+    ]
+    candidates = build_approval_tools(tools, "intent__HassTurnOn")
+    assert [item["name"] for item in candidates] == [
+        "intent__HassTurnOn", "intent__HassTurnOff",
+    ]
+    assert all(item["parameters"] == {"type": "object", "properties": {}}
+               for item in candidates)
+
+
+def test_approval_does_not_rubber_stamp_isolated_tool() -> None:
+    """Keep genuine alternatives even for an isolated proposed family."""
+    tools = [
+        {"name": "light__HassLightSet", "description": "Adjust light"},
+        {"name": "intent__HassTurnOn", "description": "Turn on"},
+        {"name": "intent__HassTurnOff", "description": "Turn off"},
+    ]
+    assert len(build_approval_tools(tools, "light__HassLightSet")) == 3
+
+
+def test_needle_negation_rejected_even_with_high_confidence() -> None:
+    """An explicit negation cannot approve an execution."""
+    result = _result(confidence=0.99)
+    result["validation"]["negation"] = True
+    with pytest.raises(RouteRejected, match="rejected the requested action"):
+        approve_route(result, 0.80, allowed_tools=ALLOWED)

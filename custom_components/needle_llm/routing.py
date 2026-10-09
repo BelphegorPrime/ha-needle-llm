@@ -89,6 +89,41 @@ def build_discovery_tools(
     ]
 
 
+def build_approval_tools(
+    tools: list[dict[str, Any]], proposed_name: str
+) -> list[dict[str, Any]]:
+    """Present alternative actions for independent, argument-free approval.
+
+    Use real alternatives in the proposed tool's native family. For tools
+    without alternatives, retain the full catalog rather than allowing
+    Needle to rubber-stamp the only available option.
+    """
+    proposed = next(
+        (tool for tool in tools if tool["name"] == proposed_name), None
+    )
+    if proposed is None:
+        return []
+
+    family = proposed_name.partition("__")[0]
+    alternatives = [
+        tool for tool in tools if tool["name"].partition("__")[0] == family
+    ]
+    if "__" not in proposed_name or len(alternatives) < 2:
+        alternatives = tools
+
+    return [
+        {
+            "name": tool["name"],
+            "description": (
+                (tool.get("title") or tool.get("description") or tool["name"])
+                .strip()[:240]
+            ),
+            "parameters": EMPTY_PARAMETERS,
+        }
+        for tool in alternatives
+    ]
+
+
 def build_routing_query(query: str) -> str:
     """Add generic routing guidance without hard-coding HA tool names."""
     return (

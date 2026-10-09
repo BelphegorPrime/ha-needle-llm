@@ -47,8 +47,11 @@ def approve_route(
         )
 
     validation = result.get("validation")
-    if isinstance(validation, dict) and validation.get("ungrounded"):
-        raise RouteRejected("Needle marked one or more arguments as ungrounded")
+    if isinstance(validation, dict):
+        if validation.get("ungrounded"):
+            raise RouteRejected("Needle marked one or more arguments as ungrounded")
+        if validation.get("negation") is True:
+            raise RouteRejected("Needle rejected the requested action")
 
     call = calls[0]
     if not isinstance(call, dict):

@@ -14,6 +14,7 @@ from homeassistant.helpers import llm
 from .client import NeedleClient, NeedleClientError
 from .ha_provider import HomeAssistantModelProvider, ProviderError
 from .routing import (
+    build_approval_tools,
     build_discovery_tools,
     build_routing_query,
     candidate_tool_names,
@@ -146,10 +147,18 @@ async def async_provider_route(
             )
         tentative = candidates[0]
 
+    approval_tools = build_approval_tools(tools, tentative)
+    if not approval_tools:
+        raise PipelineRejected(
+            "needle_approval", "Selected action is no longer available"
+        )
+
+    # Approve the original request against real alternatives. Do not send
+    # optional argument examples or full parameter schemas in this pass.
     try:
         verification, verification_transport = await needle.async_complete(
-            tools=discovery_tools,
-            query=build_routing_query(query),
+            tools=approval_tools,
+            query=query,
             stage="approval",
         )
     except NeedleClientError as err:
@@ -157,6 +166,9 @@ async def async_provider_route(
 
     diagnostics["needle_approval"] = {
         "candidate": tentative,
+        "candidate_tools": [tool["name"] for tool in approval_tools],
+        "candidate_tool_count": len(approval_tools),
+        "query_mode": "original_user_request",
         "transport": verification_transport,
         "confidence": verification.get("confidence"),
         "reasoning": verification.get("reasoning"),
@@ -169,7 +181,7 @@ async def async_provider_route(
         approved = approve_route(
             verification,
             minimum_confidence,
-            allowed_tools=available,
+            allowed_tools={tool["name"] for tool in approval_tools},
         )
     except RouteRejected as err:
         raise PipelineRejected("needle_approval", str(err)) from err

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.1 - 2026-10-09
+
+- Reduce irrelevant Needle approval options after model preselection. Needle
+  independently chooses among native same-family alternatives using the raw
+  original request and lightweight, argument-free action descriptions.
+- Fall back to the full catalog when there is no alternative in that family;
+  never force a single model-proposed action into Needle.
+- Honor Needle's explicit negation even with high confidence. Do not lower
+  the 0.8 minimum-confidence safety threshold.
+- Improve provider guidance for area-wide requests and extend diagnostics
+  with the actual approval candidates and query mode.
+- Add tests for room-level targeting, candidate competition and refusals.
+
+
 ## 0.5.0 - 2026-10-09
 
 - Add Ollama and OpenAI Conversation model provider adapters in addition to

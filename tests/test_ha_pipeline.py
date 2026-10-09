@@ -128,6 +128,11 @@ async def test_provider_requires_independent_needle_approval(strategy: str) -> N
     assert result.route.arguments == {"name": "Wohnzimmerlampe"}
     assert result.route.confidence is None
     assert diag["needle_approval"]["confidence"] == 0.97
+    assert diag["needle_approval"]["query_mode"] == "original_user_request"
+    assert diag["needle_approval"]["candidate_tool_count"] == 2
+    assert needle.async_complete.await_args.kwargs["query"] == (
+        "Schalte die Wohnzimmerlampe aus"
+    )
     assert diag["preselection"]["source"] in ("model", "needle")
     assert provider.async_complete.await_args.kwargs["tools"][0]["name"] == selected
     assert len(provider.async_complete.await_args.kwargs["tools"]) == 1
@@ -214,3 +219,39 @@ def test_provider_api_id_does_not_conflict_with_needle_api_id() -> None:
     second = api_id_for_router(url, "ha_provider", "provider-entry-2")
     assert first != second
     assert first != api_id_for_url(url)
+
+
+@pytest.mark.asyncio
+async def test_room_wide_request_uses_area_and_domain_not_invented_name() -> None:
+    """The model's area-based arguments survive a Needle tool approval."""
+    hass, context, needle, provider = _env()
+    needle.async_complete = AsyncMock(
+        return_value=(_needle_call("intent__HassTurnOn"), {})
+    )
+    provider.async_complete = AsyncMock(
+        side_effect=[
+            (_model_call("intent__HassTurnOn"), {}),
+            (
+                _model_call(
+                    "intent__HassTurnOn",
+                    {"area": "Wohnzimmer", "domain": ["light"]},
+                ),
+                {},
+            ),
+        ]
+    )
+    result = await async_provider_route(
+        hass=hass,
+        context=context,
+        query="Schalte Licht im Wohnzimmer ein",
+        tools=TOOLS,
+        needle=needle,
+        provider=provider,
+        strategy=STRATEGY_MODEL_FIRST,
+        minimum_confidence=0.8,
+        diagnostics={},
+    )
+    assert result.route.arguments == {
+        "area": "Wohnzimmer",
+        "domain": ["light"],
+    }

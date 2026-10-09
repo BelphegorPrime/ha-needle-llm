@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.5.0
+0.5.1
 ```
 
 ## License
@@ -550,3 +550,22 @@ llama.cpp/Ollama instances keep inference local if configured accordingly.
 - Add feature- and provider-specific regression tests. Avoid duplicating
   service credentials or attempting to call a provider Conversation agent
   through `conversation.process` (which may itself execute tools).
+
+
+### Approval of room-level requests (0.5.1)
+
+When the selected HA model proposes an action, Needle evaluates the raw user
+request using empty-argument schemas and real competing tools from the
+proposed tool's native family (e.g. turn-on versus turn-off). If a tool has no
+same-family alternatives, the full catalog remains available rather than
+forcing a single choice. This is an independently checked decision; it can
+still reject at the unchanged minimum confidence of 0.8 or for negation,
+ungrounded arguments, and disagreements. The approver never executes devices.
+
+For commands such as "Schalte Licht im Wohnzimmer ein", the final HA model is
+encouraged to use the area and domain fields if available, rather than
+inventing a particular device name. Home Assistant still performs the native
+target/exposure and parameter checks before any execution.
+
+The trace includes `diagnostics.needle_approval.candidate_tools`,
+`candidate_tool_count`, and `query_mode=original_user_request`.

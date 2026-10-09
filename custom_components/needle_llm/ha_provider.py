@@ -279,8 +279,10 @@ class HomeAssistantModelProvider:
             "You are a Home Assistant tool router. Select only an action "
             "grounded in the user's request. Preserve device and room names "
             "literally across languages. Never invent domains, classes, "
-            "colors, values or targets. Propose exactly one function call "
-            "for a clear action and no tool call for ambiguous requests."
+            "colors, values or targets. For a request targeting an area and "
+            "device category, use area and domain when available, without "
+            "inventing an entity name. Propose one function call for a "
+            "clear action and none for an ambiguous request."
         )
         if language:
             system += f" Conversation locale: {language}."
