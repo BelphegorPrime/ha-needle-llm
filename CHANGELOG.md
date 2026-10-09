@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.6.0 - 2026-10-09
+
+- Add a fully synthetic multilingual Needle 3 action-approval training dataset:
+  36 scenario-disjoint groups / 216 seed examples across DE, EN, FR, ES,
+  IT and NL, including negative and safety-critical controls.
+- Add deterministic offline preparation and scoring, a serial rate-limited,
+  read-only live Needle benchmark and fail-closed baseline comparison.
+- Add explicitly opt-in low-resource CPU-only LoRA training in a Docker
+  container with hard 1-CPU / 4-GiB default limits, disabled swap, low
+  scheduling priority, offline training and no cloud data generation.
+- Document an important Needle upstream limitation: local LoRA exports lose
+  the calibration head and report null confidence. Such models are
+  **not eligible for automatic Home Assistant device control**.
+- No production model swap, upload, cost-bearing API request, or background
+  worker is installed. Home Assistant routing and its 0.8 gate are unchanged.
+- Add offline dataset/safety regression tests, training documentation, and
+  ignore generated model files and training outputs.
+
 ## 0.5.7 - 2026-10-09
 
 - Fix a regression in v0.5.6 where real Home Assistant Assist tools lacking
