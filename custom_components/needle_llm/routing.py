@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection
-from difflib import SequenceMatcher
 import re
 import unicodedata
+from collections.abc import Collection
+from difflib import SequenceMatcher
 from typing import Any
 
 EMPTY_PARAMETERS: dict[str, Any] = {
