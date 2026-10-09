@@ -683,13 +683,15 @@ def _error(
                 arguments=(diagnostics or {}).get("selected_arguments"),
             ),
             "guidance": (
-                "Needle did not reach the configured confidence threshold, "
-                "so no Home Assistant action or target lookup ran. State "
-                "this low-confidence routing failure plainly; do not claim "
-                "that devices were missing or that multiple lights were "
-                "found."
+                "The action was not executed because Needle's confidence "
+                "fell below its configured threshold. Home Assistant has not "
+                "looked up any targets. Do not infer missing or ambiguous "
+                "devices. Do not ask for a specific device name as though "
+                "a lookup had found multiple lights; a room-wide light "
+                "request is valid. Explain only the confidence failure."
                 if stage == "needle_approval"
-                and reason.startswith("Needle confidence ")
+                and "Needle confidence " in reason
+                and "below " in reason
                 else (
                     "No Home Assistant device was found or acted on unless "
                     "home_assistant_execution occurred. Do not invent a target "
