@@ -13,6 +13,7 @@ from homeassistant.helpers import area_registry, llm
 
 from .client import NeedleClient, NeedleClientError
 from .ha_provider import HomeAssistantModelProvider, ProviderError
+from .request_guard import no_action_reason
 from .routing import (
     build_discovery_tools,
     build_routing_query,
@@ -20,7 +21,6 @@ from .routing import (
     candidate_tool_names,
     execution_tool,
 )
-from .request_guard import no_action_reason
 from .target_guard import find_unique_mentioned_entity
 from .translation import (
     TranslationRejected,
