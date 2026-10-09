@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.5.1
+0.5.2
 ```
 
 ## License
@@ -569,3 +569,21 @@ target/exposure and parameter checks before any execution.
 
 The trace includes `diagnostics.needle_approval.candidate_tools`,
 `candidate_tool_count`, and `query_mode=original_user_request`.
+
+
+### More focused Needle action approval (v0.5.2)
+
+When a configured HA model proposes a tool, Needle still independently
+evaluates the *original user request* with action alternatives and the
+unchanged minimum-confidence threshold. Similar **action names** within a
+native tool family are compared first, instead of sending unrelated actions
+(e.g. timer cancellation when deciding between turn-on and turn-off). This
+reduces irrelevant distractors but **does not guarantee approval**: Needle's
+own confidence, negation, grounding and action agreement checks still apply.
+
+A command like "Schalte Licht im Wohnzimmer ein" may target all exposed
+lights in the area, without naming a particular lamp. The eventual HA
+arguments should be grounded in the actual request (e.g.
+`{"area": "Wohnzimmer", "domain": ["light"]}`) and still pass HA's
+native validation. Low-confidence Needle refusals do not constitute device
+lookup failures and must not be described as missing or ambiguous entities.

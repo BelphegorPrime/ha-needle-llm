@@ -593,7 +593,11 @@ class NeedleAPI(llm.API):
                 "claim success unless the result contains executed=true. "
                 "If executed=false and no native Home Assistant tool ran, "
                 "say that routing failed; do not invent missing devices, "
-                "unavailable entities or failed entity lookups."
+                "unavailable entities or failed entity lookups. If Needle "
+                "rejected a correct tool proposal solely because its confidence "
+                "was below threshold, explain the confidence failure instead "
+                "of claiming the request was ambiguous or multiple devices "
+                "were detected."
             ),
             llm_context=llm_context,
             tools=[
@@ -679,9 +683,18 @@ def _error(
                 arguments=(diagnostics or {}).get("selected_arguments"),
             ),
             "guidance": (
-                "No Home Assistant device was found or acted on unless "
-                "home_assistant_execution occurred. Do not invent a target "
-                "lookup result."
+                "Needle did not reach the configured confidence threshold, "
+                "so no Home Assistant action or target lookup ran. State "
+                "this low-confidence routing failure plainly; do not claim "
+                "that devices were missing or that multiple lights were "
+                "found."
+                if stage == "needle_approval"
+                and reason.startswith("Needle confidence ")
+                else (
+                    "No Home Assistant device was found or acted on unless "
+                    "home_assistant_execution occurred. Do not invent a target "
+                    "lookup result."
+                )
             ),
             "diagnostics": diagnostics or {},
         },

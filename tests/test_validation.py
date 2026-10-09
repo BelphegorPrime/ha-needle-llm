@@ -431,3 +431,35 @@ def test_needle_negation_rejected_even_with_high_confidence() -> None:
     result["validation"]["negation"] = True
     with pytest.raises(RouteRejected, match="rejected the requested action"):
         approve_route(result, 0.80, allowed_tools=ALLOWED)
+
+
+
+def test_approval_filters_unrelated_same_family_actions() -> None:
+    """A timer action must not distract from the turn-on/off comparison."""
+    tools = [
+        {"name": "intent__HassTurnOn", "title": "Turn on"},
+        {"name": "intent__HassTurnOff", "title": "Turn off"},
+        {"name": "intent__HassCancelAllTimers", "title": "Cancel all timers"},
+        {"name": "light__HassLightSet", "title": "Set light"},
+    ]
+    candidates = build_approval_tools(tools, "intent__HassTurnOn")
+    assert [tool["name"] for tool in candidates] == [
+        "intent__HassTurnOn",
+        "intent__HassTurnOff",
+    ]
+    assert all(tool["parameters"] == {
+        "type": "object", "properties": {}
+    } for tool in candidates)
+
+
+def test_approval_fallback_still_has_independent_choices() -> None:
+    """Keep unrelated alternatives when no close action exists."""
+    tools = [
+        {"name": "intent__HassCancelAllTimers", "title": "Cancel timers"},
+        {"name": "intent__HassTurnOn", "title": "Turn on"},
+        {"name": "intent__HassTurnOff", "title": "Turn off"},
+    ]
+    candidates = build_approval_tools(
+        tools, "intent__HassCancelAllTimers"
+    )
+    assert len(candidates) >= 2

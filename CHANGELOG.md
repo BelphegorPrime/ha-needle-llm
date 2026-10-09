@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.2 - 2026-10-09
+
+- Refine Needle's approval alternatives using similarity of actual native
+  action names, not just broad tool-family prefixes. For turn-on proposals,
+  prefer comparing the actual turn-off alternative rather than unrelated
+  timer actions.
+- Keep multiple real choices for independent approval, and retain the
+  full-catalog fallback when no close alternative exists.
+- Never lower Needle's confidence threshold or execute failed approvals.
+- Clarify failed-route guidance so an outer conversation model does not
+  invent multiple lights or missing devices when HA was never called.
+- Add regression tests for related versus unrelated action candidates.
+
+
 ## 0.5.1 - 2026-10-09
 
 - Reduce irrelevant Needle approval options after model preselection. Needle

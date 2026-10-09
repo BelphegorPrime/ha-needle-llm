@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection
+from difflib import SequenceMatcher
 from typing import Any
 
 EMPTY_PARAMETERS: dict[str, Any] = {
@@ -104,11 +105,31 @@ def build_approval_tools(
     if proposed is None:
         return []
 
-    family = proposed_name.partition("__")[0]
-    alternatives = [
-        tool for tool in tools if tool["name"].partition("__")[0] == family
+    family, separator, action = proposed_name.partition("__")
+    same_family = [
+        tool for tool in tools
+        if tool["name"] != proposed_name
+        and tool["name"].partition("__")[0] == family
     ]
-    if "__" not in proposed_name or len(alternatives) < 2:
+    # Prefer genuinely similar operations (e.g. turn on vs turn off) over
+    # unrelated tools sharing the generic "intent" family. Never hard-code
+    # native tool names, entity domains or language-specific keywords.
+    close_alternatives = [
+        tool
+        for tool in same_family
+        if separator and SequenceMatcher(
+            None,
+            action.casefold(),
+            tool["name"].partition("__")[2].casefold(),
+        ).ratio() >= 0.72
+    ]
+    if close_alternatives:
+        alternatives = [proposed, *close_alternatives]
+    elif len(same_family) >= 1 and separator:
+        alternatives = [proposed, *same_family]
+    else:
+        # No alternative means there is no independent action comparison.
+        # Keep the full catalog rather than offering a single forced choice.
         alternatives = tools
 
     return [
