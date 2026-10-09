@@ -603,3 +603,34 @@ confidence and validation gates still apply. If both tools agree but
 Needle's confidence is below the minimum, the trace explicitly reports
 that the request was not executed; it does not claim any particular
 devices were missing or that multiple matches were found.
+
+
+### Experimental English approval retry for low-confidence agreement
+
+For **Needle + existing HA model**, an optional second approval attempt is
+triggered automatically when Needle and the HA model already independently
+selected the **same action**, but Needle's original-language confidence is
+below the configured threshold. The configured threshold (default **0.80**)
+is never lowered.
+
+The already-configured HA model translates the original request into English
+through an **argument-free, non-executable translation tool**. Exposed literal
+entity names are checked for preservation. Needle then receives the same real
+action alternatives and independently evaluates the translated request.
+Execution can continue only when the translated Needle result passes the
+original confidence threshold, chooses the **same** original action, contains
+no action arguments or suppressed calls, and passes validation. Otherwise
+the original low-confidence rejection stands.
+
+The original user utterance is always used for **final HA argument generation**.
+The translation is diagnostic data, never a Home Assistant target or executable
+instruction. The detailed trace includes an `english_fallback` record under
+`diagnostics.needle_approval`, including the original and retry confidence.
+This path adds up to one HA-model inference and one Needle inference per
+fallback and may increase latency.
+
+**Important:** Translation can change meaning even when entity names stay
+unchanged; the agreement checks reduce this risk but cannot eliminate it.
+Treat the mechanism as experimental. Test only harmless devices until a
+multilingual safety benchmark validates the behavior. Requests explicitly
+rejected by Needle's negation/grounding checks are never rescued.
