@@ -14,9 +14,9 @@ from homeassistant.helpers import area_registry, llm
 from .client import NeedleClient, NeedleClientError
 from .ha_provider import HomeAssistantModelProvider, ProviderError
 from .routing import (
-    build_semantic_approval_tools,
     build_discovery_tools,
     build_routing_query,
+    build_semantic_approval_tools,
     candidate_tool_names,
     execution_tool,
 )
