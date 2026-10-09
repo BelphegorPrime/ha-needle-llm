@@ -288,6 +288,11 @@ async def async_provider_route(
             # for final argument generation; never copy translated arguments.
             verification = second
             fallback["accepted"] = True
+            initial_approval["original_confidence"] = original_confidence
+            initial_approval["confidence"] = second_approved.confidence
+            initial_approval["reasoning"] = second.get("reasoning")
+            initial_approval["function_calls"] = second.get("function_calls", [])
+            initial_approval["validation"] = second.get("validation", {})
         except (ProviderError, NeedleClientError, RouteRejected) as err:
             fallback["reason"] = str(err)
 
