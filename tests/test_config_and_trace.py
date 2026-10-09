@@ -225,3 +225,49 @@ def test_unavailable_saved_provider_not_added_to_picker() -> None:
                 "timeout": 30,
             }
         )
+
+
+def test_trace_includes_english_retry_duration_and_scores() -> None:
+    """Do not report only the initial 3 seconds when retry took 5 more."""
+    trace = build_routing_trace(
+        {
+            "backend": BACKEND_HA_PROVIDER,
+            "routing_strategy": "model_preselection",
+            "minimum_confidence": 0.8,
+            "preselection": {
+                "source": "model",
+                "candidate": "intent__HassTurnOn",
+                "transport": {"complete_ms": 900},
+            },
+            "needle_approval": {
+                "candidate": "intent__HassTurnOn",
+                "confidence": 0.2996,
+                "function_calls": [{
+                    "name": "intent__HassTurnOn", "arguments": {}
+                }],
+                "transport": {"reset_ms": 2, "complete_ms": 2300},
+                "english_fallback": {
+                    "attempted": True,
+                    "accepted": False,
+                    "translation_transport": {"complete_ms": 1330},
+                    "needle_transport": {
+                        "reset_ms": 11, "complete_ms": 5481,
+                    },
+                    "confidence": 0.2074,
+                    "reason": "Needle confidence below 0.8",
+                },
+            },
+        },
+        status="rejected",
+        stage="needle_approval",
+    )
+    retry = next(
+        step for step in trace["steps"]
+        if step["step"] == "english_approval_retry"
+    )
+    assert retry["duration_ms"] == 6822
+    assert retry["original_confidence"] == 0.2996
+    assert retry["retry_confidence"] == 0.2074
+    assert retry["status"] == "rejected"
+    assert trace["total_ms"] == 10024
+    assert trace["timing_note"] == "Stage times only (partial trace)"
