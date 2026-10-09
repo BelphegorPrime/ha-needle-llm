@@ -87,7 +87,7 @@ def test_prepare_generates_upstream_compatible_jsonl(tmp_path: Path) -> None:
         json.loads(line)
         for line in (tmp_path / "train.jsonl").read_text().splitlines()
     ]
-    assert len(train) == 144
+    assert len(train) == 216
     assert all({"query", "tools", "answers"} <= set(row) for row in train)
     assert all(row["tools"][0]["parameters"] == {
         "type": "object", "properties": {}
