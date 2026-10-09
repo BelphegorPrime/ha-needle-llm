@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.3 - 2026-10-09
+
+- Preserve native Home Assistant tool descriptions alongside short action
+  titles in Needle's independent approval pass; the former implementation
+  discarded the description whenever a title existed.
+- Keep the approved tool alternatives, their empty argument schemas, and
+  the 0.8 minimum-confidence gate unchanged.
+- Report explicit model/Needle agreement separately from low-confidence
+  rejection, without falsely suggesting missing or ambiguous HA entities.
+- Add regression tests for native description preservation.
+
+
 ## 0.5.2 - 2026-10-09
 
 - Refine Needle's approval alternatives using similarity of actual native

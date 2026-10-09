@@ -463,3 +463,52 @@ def test_approval_fallback_still_has_independent_choices() -> None:
         tools, "intent__HassCancelAllTimers"
     )
     assert len(candidates) >= 2
+
+
+
+def test_approval_preserves_native_description_with_short_title() -> None:
+    """Needle should see action semantics, not just a two-word title."""
+    tools = [
+        {
+            "name": "intent__HassTurnOn",
+            "title": "Turn on",
+            "description": "Activate a named device or all devices in an area.",
+        },
+        {
+            "name": "intent__HassTurnOff",
+            "title": "Turn off",
+            "description": "Deactivate a named device or all devices in an area.",
+        },
+    ]
+    proposed = build_approval_tools(tools, "intent__HassTurnOn")
+    assert [item["name"] for item in proposed] == [
+        "intent__HassTurnOn",
+        "intent__HassTurnOff",
+    ]
+    assert "all devices in an area" in proposed[0]["description"]
+    assert "all devices in an area" in proposed[1]["description"]
+    assert proposed[0]["description"].startswith("Turn on.")
+    assert proposed[1]["description"].startswith("Turn off.")
+    assert all(
+        tool["parameters"] == {"type": "object", "properties": {}}
+        for tool in proposed
+    )
+
+
+def test_approval_description_avoids_duplicate_title() -> None:
+    """Do not repeat identical titles and descriptions."""
+    tools = [
+        {
+            "name": "intent__HassTurnOn",
+            "title": "Turn on",
+            "description": "Turn on",
+        },
+        {
+            "name": "intent__HassTurnOff",
+            "title": "Turn off",
+            "description": "Turn off.",
+        },
+    ]
+    candidates = build_approval_tools(tools, "intent__HassTurnOn")
+    assert candidates[0]["description"] == "Turn on"
+    assert candidates[1]["description"] == "Turn off"

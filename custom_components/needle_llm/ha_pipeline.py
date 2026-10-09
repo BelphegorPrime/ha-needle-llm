@@ -184,7 +184,25 @@ async def async_provider_route(
             allowed_tools={tool["name"] for tool in approval_tools},
         )
     except RouteRejected as err:
-        raise PipelineRejected("needle_approval", str(err)) from err
+        reason = str(err)
+        # Agreement on an operation is not approval: the calibrated Needle
+        # confidence gate still decides whether execution may proceed.
+        calls = verification.get("function_calls")
+        if (
+            reason.startswith("Needle confidence ")
+            and isinstance(calls, list)
+            and len(calls) == 1
+            and isinstance(calls[0], dict)
+            and calls[0].get("name") == tentative
+        ):
+            diagnostics["needle_approval"]["agreed_but_low_confidence"] = True
+            reason = (
+                f"Model and Needle selected the same operation ({tentative}), "
+                f"but {reason}. No Home Assistant lookup or action ran; "
+                "this does not establish that any devices are missing "
+                "or that multiple devices were found."
+            )
+        raise PipelineRejected("needle_approval", reason) from err
 
     if approved.tool != tentative:
         raise PipelineRejected(

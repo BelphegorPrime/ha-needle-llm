@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.5.2
+0.5.3
 ```
 
 ## License
@@ -587,3 +587,19 @@ arguments should be grounded in the actual request (e.g.
 `{"area": "Wohnzimmer", "domain": ["light"]}`) and still pass HA's
 native validation. Low-confidence Needle refusals do not constitute device
 lookup failures and must not be described as missing or ambiguous entities.
+
+
+### Needle approval semantics (v0.5.3)
+
+The approval stage compares the model's proposed native Assist action with
+real alternatives (for instance, turn-on versus turn-off). It now includes
+the **native action description** alongside the short title, without any
+parameters or inferred targets. In multilingual requests this provides
+more information for Needle's semantic decision, though it does not
+guarantee higher confidence.
+
+A matching operation is **not itself permission to execute**: Needle's
+confidence and validation gates still apply. If both tools agree but
+Needle's confidence is below the minimum, the trace explicitly reports
+that the request was not executed; it does not claim any particular
+devices were missing or that multiple matches were found.

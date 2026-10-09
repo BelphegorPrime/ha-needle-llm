@@ -90,6 +90,28 @@ def build_discovery_tools(
     ]
 
 
+def _approval_description(tool: dict[str, Any]) -> str:
+    """Retain native action context instead of a vague title alone.
+
+    Home Assistant intent titles such as "Turn on" and "Turn off" are short.
+    Giving Needle the native description *as well* provides useful semantic
+    grounding across languages, without suggesting parameters or targets.
+    """
+    title = tool.get("title")
+    description = tool.get("description")
+    text = (
+        title.strip() if isinstance(title, str) and title.strip() else ""
+    )
+    detail = (
+        description.strip()
+        if isinstance(description, str) and description.strip()
+        else ""
+    )
+    if detail and detail.casefold().rstrip(".") != text.casefold().rstrip("."):
+        text = f"{text}. {detail}" if text else detail
+    return (text or tool["name"]).strip()[:400]
+
+
 def build_approval_tools(
     tools: list[dict[str, Any]], proposed_name: str
 ) -> list[dict[str, Any]]:
@@ -135,10 +157,7 @@ def build_approval_tools(
     return [
         {
             "name": tool["name"],
-            "description": (
-                (tool.get("title") or tool.get("description") or tool["name"])
-                .strip()[:240]
-            ),
+            "description": _approval_description(tool),
             "parameters": EMPTY_PARAMETERS,
         }
         for tool in alternatives
