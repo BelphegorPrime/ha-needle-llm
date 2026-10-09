@@ -22,7 +22,7 @@ _NEGATIONS = (
         r"\b(?:nicht|niemals|nie|kein(?:e|en|em|er|es)?|auf keinen fall)\b"
     ),
     re.compile(r"\b(?:don't|do not|never|not)\b"),
-    re.compile(r"\b(?:ne\s+\S+\s+pas|n['’]\w+.{0,80}\bpas|jamais|surtout pas)\b"),
+    re.compile(r"\b(?:ne\s+\S+\s+pas|n['’]\w+.{0,80}\bpas|pas|jamais|surtout pas)\b"),
     re.compile(r"\b(?:no|nunca|jam[aá]s|ni se te ocurra)\b"),
     re.compile(r"\b(?:non|mai)\b"),
     re.compile(r"\b(?:niet|geen|nooit)\b"),
@@ -33,7 +33,10 @@ _NEGATIONS = (
 _HYPOTHETICALS = (
     re.compile(r"^wenn du könntest\b.*\bwürdest du\b"),
     re.compile(r"^if you could\b.*\bwould you\b"),
-    re.compile(r"^si tu pouvais\b.*\b(?:ferais|pourrais|déverrouillerais|verrouillerais|ouvrirais)\b"),
+    re.compile(
+        r"^si tu pouvais\b.*\b"
+        r"(?:ferais|pourrais|déverrouillerais|verrouillerais|ouvrirais)\b"
+    ),
     re.compile(r"^si pudieras\b.*"),
     re.compile(r"^se potessi\b.*"),
     re.compile(r"^als je kon\b.*"),
