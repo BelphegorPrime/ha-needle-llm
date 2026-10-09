@@ -34,6 +34,7 @@ from .ha_pipeline import (
     async_provider_route,
 )
 from .ha_provider import HomeAssistantModelProvider
+from .request_guard import no_action_reason
 from .routing import (
     build_discovery_tools,
     build_routing_query,
@@ -93,6 +94,16 @@ class NeedleRouteTool(llm.Tool):
         """Route one request to the native Home Assistant Assist API."""
         request_started = time.monotonic()
         query = tool_input.tool_args["query"]
+
+        # Block explicit prohibitions and hypothetical questions before *any*
+        # tool discovery, provider fallback or Home Assistant API lookup.
+        # Not a substitute for target reconciliation and confidence checks.
+        blocked = no_action_reason(query)
+        if blocked is not None:
+            return _error(
+                blocked, stage="request_guard",
+                diagnostics={"request_guard": "explicit_no_action"},
+            )
 
         try:
             assist_api = await llm.async_get_api(

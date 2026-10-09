@@ -13,6 +13,7 @@ from homeassistant.helpers import area_registry, llm
 
 from .client import NeedleClient, NeedleClientError
 from .ha_provider import HomeAssistantModelProvider, ProviderError
+from .request_guard import no_action_reason
 from .routing import (
     build_discovery_tools,
     build_routing_query,
@@ -127,6 +128,10 @@ async def async_provider_route(
     entire native discovery surface and must independently agree with the
     preselected action at the configured confidence threshold.
     """
+    blocked = no_action_reason(query)
+    if blocked is not None:
+        raise PipelineRejected("request_guard", blocked)
+
     if strategy not in STRATEGIES:
         raise PipelineRejected("configuration", "Unknown routing strategy")
 

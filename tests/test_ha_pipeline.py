@@ -412,8 +412,8 @@ async def test_english_fallback_cannot_translate_exposed_names() -> None:
 
 
 @pytest.mark.asyncio
-async def test_explicit_needle_negation_never_triggers_translation() -> None:
-    """Never use translated text to override an explicit native refusal."""
+async def test_explicit_negation_never_calls_provider_or_needle() -> None:
+    """The deterministic preflight rejects negation before any network call."""
     hass, context, needle, provider = _env()
     negative = _needle_call("intent__HassTurnOn", confidence=0.222)
     negative["validation"]["negation"] = True
@@ -433,7 +433,8 @@ async def test_explicit_needle_negation_never_triggers_translation() -> None:
             minimum_confidence=0.8,
             diagnostics={},
         )
-    assert provider.async_complete.await_count == 1
+    provider.async_complete.assert_not_awaited()
+    needle.async_complete.assert_not_awaited()
 
 
 @pytest.mark.asyncio
