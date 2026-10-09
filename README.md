@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.5.3
+0.5.4
 ```
 
 ## License
@@ -614,7 +614,7 @@ below the configured threshold. The configured threshold (default **0.80**)
 is never lowered.
 
 The already-configured HA model translates the original request into English
-through an **argument-free, non-executable translation tool**. Exposed literal
+through a **non-executable translation tool**. Exposed literal
 entity names are checked for preservation. Needle then receives the same real
 action alternatives and independently evaluates the translated request.
 Execution can continue only when the translated Needle result passes the
