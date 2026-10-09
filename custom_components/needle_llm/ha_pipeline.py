@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from homeassistant.components.homeassistant.exposed_entities import (
@@ -241,17 +241,25 @@ async def async_provider_route(
             # The fallback is for language normalization, not rewriting
             # already-English inputs. Never use it to rescue a refusal.
             if english.casefold() == query.strip().casefold():
-                raise RouteRejected("English normalization did not change the request")
+                raise RouteRejected(
+                    "English normalization did not change the request"
+                )
             # Names are literal HA identifiers, regardless of locale.
             for state in hass.states.async_all():
-                if not async_should_expose(hass, context.assistant, state.entity_id):
+                if not async_should_expose(
+                    hass, context.assistant, state.entity_id
+                ):
                     continue
                 name = state.name
                 if not isinstance(name, str) or not name.strip():
                     continue
-                if re.search(r"(?<!\\w)" + re.escape(name) + r"(?!\\w)", query, re.I):
-                    if not re.search(r"(?<!\\w)" + re.escape(name) + r"(?!\\w)", english, re.I):
-                        raise RouteRejected("English normalization changed an exposed entity name")
+                pattern = r"(?<!\\w)" + re.escape(name) + r"(?!\\w)"
+                if re.search(pattern, query, re.I) and not re.search(
+                    pattern, english, re.I
+                ):
+                    raise RouteRejected(
+                        "English normalization changed an exposed entity name"
+                    )
             # Do not let the translation suppress a negation in the original.
             # In all cases Needle must still choose the same action with the
             # configured minimum confidence, and with no argument payload.
@@ -273,7 +281,9 @@ async def async_provider_route(
             if second_approved.tool != tentative or second_approved.arguments:
                 raise RouteRejected("English approval disagreed with original action")
             if second.get("suppressed_calls"):
-                raise RouteRejected("English approval contained suppressed calls")
+                raise RouteRejected(
+                    "English approval contained suppressed calls"
+                )
             # Retain both decisions in diagnostics and the original request
             # for final argument generation; never copy translated arguments.
             verification = second
@@ -293,7 +303,9 @@ async def async_provider_route(
         # confidence gate still decides whether execution may proceed.
         calls = verification.get("function_calls")
         if (
-            not diagnostics["needle_approval"].get("english_fallback", {}).get("accepted")
+            not diagnostics["needle_approval"]
+            .get("english_fallback", {})
+            .get("accepted")
             and reason.startswith("Needle confidence ")
             and isinstance(calls, list)
             and len(calls) == 1
