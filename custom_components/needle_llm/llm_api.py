@@ -45,6 +45,7 @@ from .target_guard import (
     find_unique_mentioned_entity,
     reconcile_named_target,
 )
+from .request_guard import no_action_reason
 from .trace import build_routing_trace
 from .validation import (
     RouteRejected,
@@ -93,6 +94,16 @@ class NeedleRouteTool(llm.Tool):
         """Route one request to the native Home Assistant Assist API."""
         request_started = time.monotonic()
         query = tool_input.tool_args["query"]
+
+        # Block explicit prohibitions and hypothetical questions before *any*
+        # tool discovery, provider fallback or Home Assistant API lookup.
+        # Not a substitute for target reconciliation and confidence checks.
+        blocked = no_action_reason(query)
+        if blocked is not None:
+            return _error(
+                blocked, stage="request_guard",
+                diagnostics={"request_guard": "explicit_no_action"},
+            )
 
         try:
             assist_api = await llm.async_get_api(
