@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.4 - 2026-10-09
+
+- Add an experimental English approval fallback when the configured Home
+  Assistant model and Needle agree on an action but Needle's confidence
+  for the original request is below the configured threshold.
+- Ask the already configured model for a non-executable English translation,
+  preserve literal exposed entity names, and retry Needle approval using the
+  same competing native Assist actions.
+- Keep the minimum confidence threshold unchanged and reject disagreement,
+  negation, ungrounded or malformed outputs, suppressed calls, or low-confidence
+  English retries. Final arguments always use the original user request.
+- Expose both initial and effective confidence, retry diagnostics, and
+  stage timings; cover success and fail-closed behavior with regression tests.
+
+
 ## 0.5.3 - 2026-10-09
 
 - Preserve native Home Assistant tool descriptions alongside short action
