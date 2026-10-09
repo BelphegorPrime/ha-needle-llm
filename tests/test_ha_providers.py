@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from homeassistant.config_entries import ConfigEntryState
 
 from custom_components.needle_llm.ha_provider import (
