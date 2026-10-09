@@ -559,3 +559,58 @@ def test_nonfinite_or_out_of_range_confidence_rejected(invalid: float) -> None:
     """Nonfinite numbers must never bypass Needle's confidence gate."""
     with pytest.raises(RouteRejected, match="invalid confidence"):
         approve_route(_result(confidence=invalid), 0.8, allowed_tools=ALLOWED)
+
+
+
+def test_semantic_aliases_derive_from_native_names_without_titles() -> None:
+    """Actual HA native Assist tools can omit the title field entirely."""
+    tools = [
+        {"name": "intent__HassTurnOn",
+         "description": "Turn on a device or area"},
+        {"name": "intent__HassTurnOff",
+         "description": "Turn off a device or area"},
+    ]
+    aliased, mapping = build_semantic_approval_tools(
+        tools, "intent__HassTurnOn"
+    )
+    assert [item["name"] for item in aliased] == ["turn_on", "turn_off"]
+    assert mapping == {
+        "turn_on": "intent__HassTurnOn",
+        "turn_off": "intent__HassTurnOff",
+    }
+    assert "Turn on a device" in aliased[0]["description"]
+    assert "Turn off a device" in aliased[1]["description"]
+    assert all(item["parameters"] == {
+        "type": "object", "properties": {}
+    } for item in aliased)
+
+
+def test_native_aliases_keep_unique_action_when_namespaces_differ() -> None:
+    """Never strip away unrelated action words or change the meaning."""
+    tools = [
+        {"name": "intent__HassTurnOn", "description": "Turn on"},
+        {"name": "media__PlayMedia", "description": "Play media"},
+    ]
+    result, mapping = build_semantic_approval_tools(
+        tools, "media__PlayMedia"
+    )
+    assert set(mapping.values()) == set(tool["name"] for tool in tools)
+    assert result[0]["name"] == "play_media"
+
+
+def test_native_aliases_safely_fall_back_on_collisions() -> None:
+    """Two native tool names deriving the same action must not be conflated."""
+    tools = [
+        {"name": "intent__HassTurnOn", "description": "Turn on"},
+        {"name": "other__HassTurnOn", "description": "Turn on other"},
+    ]
+    result, mapping = build_semantic_approval_tools(
+        tools, "intent__HassTurnOn"
+    )
+    assert [tool["name"] for tool in result] == [
+        "intent__HassTurnOn", "other__HassTurnOn"
+    ]
+    assert mapping == {
+        "intent__HassTurnOn": "intent__HassTurnOn",
+        "other__HassTurnOn": "other__HassTurnOn",
+    }
