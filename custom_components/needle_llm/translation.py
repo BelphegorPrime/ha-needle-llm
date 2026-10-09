@@ -66,7 +66,7 @@ def restore_literal_names(
             raise TranslationRejected(
                 f"English normalization omitted or duplicated {marker}"
             )
-        translated = pattern.sub(lambda _match: original, translated)
+        translated = pattern.sub(lambda _match, value=original: value, translated)
 
     if _TOKEN_RE.search(translated):
         raise TranslationRejected(
