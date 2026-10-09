@@ -4,6 +4,7 @@ import pytest
 
 from custom_components.needle_llm.routing import (
     build_approval_tools,
+    build_semantic_approval_tools,
     build_discovery_tools,
     build_routing_query,
     candidate_tool_names,
@@ -512,3 +513,40 @@ def test_approval_description_avoids_duplicate_title() -> None:
     candidates = build_approval_tools(tools, "intent__HassTurnOn")
     assert candidates[0]["description"] == "Turn on"
     assert candidates[1]["description"] == "Turn off"
+
+
+def test_semantic_approval_aliases_use_real_native_titles() -> None:
+    """Keep independent alternatives and map semantic names to native tools."""
+    tools = [
+        {"name": "intent__HassTurnOn", "title": "Turn on", "description": "Turn on devices"},
+        {"name": "intent__HassTurnOff", "title": "Turn off", "description": "Turn off devices"},
+    ]
+    aliased, mapping = build_semantic_approval_tools(
+        tools, "intent__HassTurnOn"
+    )
+    assert [item["name"] for item in aliased] == ["turn_on", "turn_off"]
+    assert mapping == {
+        "turn_on": "intent__HassTurnOn",
+        "turn_off": "intent__HassTurnOff",
+    }
+    assert all(item["parameters"] == {
+        "type": "object", "properties": {}
+    } for item in aliased)
+
+
+def test_semantic_aliases_fail_to_native_names_on_title_collision() -> None:
+    """Duplicate titles must never cause a name to resolve to the wrong tool."""
+    tools = [
+        {"name": "intent__HassTurnOn", "title": "Operate"},
+        {"name": "intent__HassTurnOff", "title": "Operate"},
+    ]
+    aliased, mapping = build_semantic_approval_tools(
+        tools, "intent__HassTurnOn"
+    )
+    assert [item["name"] for item in aliased] == [
+        "intent__HassTurnOn", "intent__HassTurnOff"
+    ]
+    assert mapping == {
+        "intent__HassTurnOn": "intent__HassTurnOn",
+        "intent__HassTurnOff": "intent__HassTurnOff",
+    }
