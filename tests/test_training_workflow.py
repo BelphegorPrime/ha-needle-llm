@@ -11,7 +11,6 @@ from training.workflow import (
     LANGUAGES,
     accepted_action,
     cmd_compare,
-    cmd_score,
     load_scenarios,
     main,
     prepared_rows,
