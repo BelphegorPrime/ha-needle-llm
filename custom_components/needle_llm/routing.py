@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from difflib import SequenceMatcher
+import re
+import unicodedata
 from typing import Any
 
 EMPTY_PARAMETERS: dict[str, Any] = {
@@ -162,6 +164,61 @@ def build_approval_tools(
         }
         for tool in alternatives
     ]
+
+
+
+def _approval_alias(title: str | None) -> str | None:
+    """Convert a native action title into a concise, model-friendly tool name.
+
+    This is a presentation alias, never a native Home Assistant capability.
+    No intent names, domains or translated action vocabulary are hard-coded.
+    """
+    if not isinstance(title, str) or not title.strip():
+        return None
+    ascii_title = unicodedata.normalize("NFKD", title)
+    ascii_title = ascii_title.encode("ascii", "ignore").decode("ascii")
+    alias = re.sub(r"[^a-z0-9]+", "_", ascii_title.casefold()).strip("_")
+    # Restrict synthetic tool names to standard function-identifier syntax.
+    if not alias or not alias[0].isalpha() or len(alias) > 64:
+        return None
+    return alias
+
+
+def build_semantic_approval_tools(
+    tools: list[dict[str, Any]], proposed_name: str
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Show Needle meaningful tool names, mapping them to native HA names.
+
+    The aliases improve schema readability but cannot bypass Needle's own
+    confidence gate. Duplicate titles or ambiguous aliases fall back to the
+    original unique tool names. Only names from this mapping are executable.
+    """
+    native = build_approval_tools(tools, proposed_name)
+    originals = {tool["name"]: tool for tool in tools}
+    titles = {
+        tool["name"]: _approval_alias(originals[tool["name"]].get("title"))
+        for tool in native
+    }
+    reserved = {tool["name"] for tool in native}
+    used: set[str] = set()
+    aliases: dict[str, str] = {}
+    result: list[dict[str, Any]] = []
+    for tool in native:
+        original = tool["name"]
+        candidate = titles[original]
+        if (
+            candidate is None
+            or candidate in reserved
+            or sum(value == candidate for value in titles.values()) != 1
+        ):
+            candidate = original
+        if candidate in used:
+            # Cannot safely form a unique alias without guessing a name.
+            return native, {item["name"]: item["name"] for item in native}
+        used.add(candidate)
+        aliases[candidate] = original
+        result.append({**tool, "name": candidate})
+    return result, aliases
 
 
 def build_routing_query(query: str) -> str:
