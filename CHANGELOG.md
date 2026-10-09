@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.5 - 2026-10-09
+
+- Fix the v0.5.4 English approval fallback rejecting valid translations when a
+  generic request word also appears as a real exposed entity name (e.g. `Licht`).
+- Protect whole-name mentions of exposed entities and registered Home Assistant
+  areas with opaque placeholders *before* translation, then restore them
+  exactly once before the independent Needle approval.
+- Reject missing, duplicated or invented markers, preserve the original
+  argument-generation request and keep the 0.8 confidence gate unchanged.
+- Add regression coverage for the reported German room-light request,
+  overlapping identifier names and translation tampering.
+- Align package and integration versions.
+
 ## 0.5.4 - 2026-10-09
 
 - Add an experimental English approval fallback when the configured Home
