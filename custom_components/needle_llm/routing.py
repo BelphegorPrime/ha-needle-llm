@@ -184,6 +184,42 @@ def _approval_alias(title: str | None) -> str | None:
     return alias
 
 
+def _native_action_aliases(
+    native: list[dict[str, Any]],
+) -> dict[str, str | None]:
+    """Derive readable aliases from actual native function names.
+
+    Assist exports names like intent__HassTurnOn but often provides *no*
+    separate title. Split the action part's CamelCase without translating
+    its meaning. Drop one shared leading namespace word only when *all*
+    alternatives have at least three words.
+    """
+    parts: dict[str, list[str]] = {}
+    for tool in native:
+        name = tool["name"]
+        if not isinstance(name, str):
+            return {}
+        # The prefix before '__' is a tool namespace, not its action.
+        action = name.rpartition("__")[2] or name
+        words = re.findall(
+            r"[A-Z]+(?=[A-Z][a-z]|\\b)|[A-Z]?[a-z]+|[0-9]+",
+            action,
+        )
+        parts[name] = [word.casefold() for word in words]
+
+    nonempty = list(parts.values())
+    strip_prefix = (
+        len(nonempty) >= 2
+        and all(len(words) >= 3 for words in nonempty)
+        and len({words[0] for words in nonempty}) == 1
+    )
+    result: dict[str, str | None] = {}
+    for name, words in parts.items():
+        candidate = "_".join(words[1:] if strip_prefix else words)
+        result[name] = _approval_alias(candidate)
+    return result
+
+
 def build_semantic_approval_tools(
     tools: list[dict[str, Any]], proposed_name: str
 ) -> tuple[list[dict[str, Any]], dict[str, str]]:
@@ -195,8 +231,12 @@ def build_semantic_approval_tools(
     """
     native = build_approval_tools(tools, proposed_name)
     originals = {tool["name"]: tool for tool in tools}
+    fallback_names = _native_action_aliases(native)
     titles = {
-        tool["name"]: _approval_alias(originals[tool["name"]].get("title"))
+        tool["name"]: (
+            _approval_alias(originals[tool["name"]].get("title"))
+            or fallback_names.get(tool["name"])
+        )
         for tool in native
     }
     reserved = {tool["name"] for tool in native}
