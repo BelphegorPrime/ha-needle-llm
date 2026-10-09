@@ -99,7 +99,7 @@ def test_offline_score_never_executes_any_tools(tmp_path: Path) -> None:
     source = prepared_rows(load_scenarios(DATASET), "test")[:2]
     source_file = tmp_path / "source.jsonl"
     source_file.write_text(
-        "".join(json.dumps(x, ensure_ascii=False) + "\\n" for x in source),
+        "".join(json.dumps(x, ensure_ascii=False) + "\n" for x in source),
         encoding="utf-8",
     )
     answers = []
@@ -118,7 +118,7 @@ def test_offline_score_never_executes_any_tools(tmp_path: Path) -> None:
         })
     predictions = tmp_path / "predictions.jsonl"
     predictions.write_text(
-        "".join(json.dumps(x) + "\\n" for x in answers), encoding="utf-8"
+        "".join(json.dumps(x) + "\n" for x in answers), encoding="utf-8"
     )
     output = tmp_path / "result.json"
     assert main([
