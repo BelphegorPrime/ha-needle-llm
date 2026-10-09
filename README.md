@@ -678,7 +678,7 @@ and this integration intentionally rejects missing confidence values.
 
 ## Experimental, resource-constrained multilingual training
 
-The reproducible six-language synthetic corpus, disjoint train/validation/test
+The reproducible six-language synthetic corpus (288 examples, 216 for training), disjoint train/validation/test
 splits, read-only Needle baseline benchmark, safety comparison and CPU-limited
 LoRA training container are documented in
 [training/README.md](training/README.md).
