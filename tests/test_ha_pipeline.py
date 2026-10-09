@@ -185,7 +185,13 @@ async def test_low_needle_confidence_prevents_final_model_call() -> None:
             minimum_confidence=0.8,
             diagnostics={},
         )
-    assert provider.async_complete.await_count == 1
+    # A low-confidence agreement may make one non-executable translation
+    # request, but must never reach native argument generation.
+    assert provider.async_complete.await_count == 2
+    assert provider.async_complete.await_args.kwargs["stage"] == (
+        "approval_translation"
+    )
+    needle.async_complete.assert_awaited_once()
 
 
 def test_provider_selection_requires_entry_and_model() -> None:
