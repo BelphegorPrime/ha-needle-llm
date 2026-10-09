@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 import voluptuous as vol
 
@@ -271,3 +273,25 @@ def test_trace_includes_english_retry_duration_and_scores() -> None:
     assert retry["status"] == "rejected"
     assert trace["total_ms"] == 10024
     assert trace["timing_note"] == "Stage times only (partial trace)"
+
+
+
+def test_agreed_low_confidence_does_not_imply_ambiguous_devices() -> None:
+    """The prefixed error reason still gets the correct user guidance."""
+    from custom_components.needle_llm.llm_api import _error
+
+    reason = (
+        "Model and Needle selected the same operation (intent__HassTurnOn), "
+        "but Needle confidence 0.2456 is below 0.8000."
+    )
+    with patch(
+        "custom_components.needle_llm.llm_api.make_tool_result",
+        side_effect=lambda body, error: body,
+    ):
+        response = _error(
+            reason, stage="needle_approval",
+            diagnostics={"backend": "ha_provider"},
+        )
+    assert response["executed"] is False
+    assert "has not looked up any targets" in response["guidance"]
+    assert "Do not ask for a specific device name" in response["guidance"]
