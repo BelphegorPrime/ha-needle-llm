@@ -271,6 +271,55 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
     return 2 if report["metrics"]["overall"]["transport_errors"] else 0
 
 
+def cmd_score(args: argparse.Namespace) -> int:
+    """Deterministic offline scoring of saved responses (no HTTP calls)."""
+    examples = read_jsonl(args.dataset)
+    predictions = read_jsonl(args.predictions)
+    lookup: dict[tuple[str, str], dict[str, Any]] = {}
+    for pred in predictions:
+        key = (pred["scenario_id"], pred["locale"])
+        if key in lookup:
+            raise ValueError(f"Duplicate prediction: {key}")
+        lookup[key] = pred
+    keys = {(r["scenario_id"], r["locale"]) for r in examples}
+    if set(lookup) != keys:
+        raise ValueError("Predictions must match all scenario/locale identifiers")
+    cases = []
+    for row in examples:
+        pred = lookup[(row["scenario_id"], row["locale"])]
+        reply = pred.get("response")
+        if not isinstance(reply, dict):
+            raise ValueError("Each prediction must include a Needle response object")
+        raw = reply.get("confidence")
+        confidence = (
+            float(raw) if isinstance(raw, (int, float))
+            and math.isfinite(raw) else None
+        )
+        expected = row["answers"][0]["name"] if row["answers"] else None
+        cases.append({
+            "scenario_id": row["scenario_id"], "locale": row["locale"],
+            "risk": row["risk"], "expected": expected,
+            "approved": accepted_action(
+                reply, {tool["name"] for tool in row["tools"]}, args.gate
+            ),
+            "raw_calls": reply.get("function_calls", []),
+            "confidence": confidence,
+            "latency_ms": float(pred.get("latency_ms", 0)),
+            "error": None,
+        })
+    report = {
+        "format": 1, "confidence_gate": args.gate,
+        "metrics": score_rows(cases), "cases": cases,
+    }
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+    print(json.dumps(report["metrics"], indent=2))
+    return 0
+
+
 def cmd_compare(args: argparse.Namespace) -> int:
     """Fail closed when a tuned candidate introduces any safety regression."""
     baseline = json.loads(args.baseline.read_text(encoding="utf-8"))
@@ -330,6 +379,13 @@ def main(argv: list[str] | None = None) -> int:
     evaluate.add_argument("--delay", type=float, default=1.0)
     evaluate.add_argument("--max-cases", type=int, default=48)
     evaluate.set_defaults(func=cmd_evaluate)
+
+    score = sub.add_parser("score", help="Offline scoring of saved Needle responses, no network")
+    score.add_argument("--dataset", required=True, type=Path)
+    score.add_argument("--predictions", required=True, type=Path)
+    score.add_argument("--output", required=True, type=Path)
+    score.add_argument("--gate", type=float, default=GATE)
+    score.set_defaults(func=cmd_score)
 
     compare = sub.add_parser("compare", help="Compare identical held-out baselines and candidates")
     compare.add_argument("--baseline", required=True, type=Path)
