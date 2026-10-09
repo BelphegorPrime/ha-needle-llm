@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 import voluptuous as vol
 
 from custom_components.needle_llm.config_flow import (
@@ -179,3 +180,48 @@ def test_rejected_trace_must_not_claim_executed_action() -> None:
     assert "home_assistant" not in {
         step["step"] for step in result["steps"]
     }
+
+
+def test_old_home_assistant_hides_missing_provider_mode() -> None:
+    """Older versions with no compatible models show Needle standalone only."""
+    selector = next(
+        iter(
+            _mode_schema(
+                BACKEND_HA_PROVIDER, provider_available=False
+            ).schema.values()
+        )
+    )
+    values = {item["value"] for item in selector.config["options"]}
+    assert values == {BACKEND_NEEDLE}
+
+
+def test_provider_mode_is_available_when_capability_detected() -> None:
+    """The extra mode appears based on providers, not a fixed HA version."""
+    selector = next(
+        iter(
+            _mode_schema(
+                BACKEND_NEEDLE, provider_available=True
+            ).schema.values()
+        )
+    )
+    values = {item["value"] for item in selector.config["options"]}
+    assert values == {BACKEND_NEEDLE, BACKEND_HA_PROVIDER}
+
+
+def test_unavailable_saved_provider_not_added_to_picker() -> None:
+    """Do not let users select an unloaded/unsupported model."""
+    schema = _settings_schema(
+        backend=BACKEND_HA_PROVIDER,
+        provider_choices={"available:model": "Available model"},
+        values={"provider_model": "removed:model"},
+    )
+    with pytest.raises(vol.Invalid):
+        schema(
+            {
+                "provider_model": "removed:model",
+                "routing_strategy": "needle_preselection",
+                "url": "http://needle:7860",
+                "min_confidence": 0.8,
+                "timeout": 30,
+            }
+        )

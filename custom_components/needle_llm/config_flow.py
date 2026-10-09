@@ -72,13 +72,19 @@ def _selector(labels: dict[str, str]) -> SelectSelector:
     )
 
 
-def _mode_schema(backend: str) -> vol.Schema:
-    """First page: what sort of routing should Home Assistant use?"""
+def _mode_schema(
+    backend: str, *, provider_available: bool = True
+) -> vol.Schema:
+    """Offer provider routing only if a compatible HA model exists."""
+    labels = dict(_BACKEND_LABELS)
+    if not provider_available:
+        labels.pop(BACKEND_HA_PROVIDER)
     return vol.Schema(
         {
-            vol.Required(CONF_BACKEND, default=backend): _selector(
-                _BACKEND_LABELS
-            )
+            vol.Required(
+                CONF_BACKEND,
+                default=backend if backend in labels else BACKEND_NEEDLE,
+            ): _selector(labels)
         }
     )
 
@@ -100,8 +106,6 @@ def _settings_schema(
         # Put the model and understandable strategy before technical URL fields.
         models = dict(provider_choices)
         old_selection = values.get(CONF_PROVIDER_MODEL)
-        if old_selection and old_selection not in models:
-            models[old_selection] = "Previously selected (unavailable)"
         if models:
             selected = (
                 old_selection if old_selection in models
@@ -222,7 +226,10 @@ class NeedleLLMConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_settings()
         return self.async_show_form(
             step_id="user",
-            data_schema=_mode_schema(self._selected_backend),
+            data_schema=_mode_schema(
+                self._selected_backend,
+                provider_available=bool(available_provider_models(self.hass)),
+            ),
         )
 
     async def async_step_settings(

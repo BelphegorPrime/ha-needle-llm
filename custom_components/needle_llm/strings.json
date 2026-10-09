@@ -23,7 +23,7 @@
           "timeout": "Timeout per model request (seconds)"
         },
         "data_description": {
-          "provider_model": "A configured llama.cpp model. Server URL, credentials and model ID are reused automatically from Home Assistant.",
+          "provider_model": "Use an existing llama.cpp, Ollama, or OpenAI Conversation model. Its connection and credentials are reused.",
           "routing_strategy": "Both options require independent Needle approval. The existing HA model generates the final tool arguments.",
           "url": "Needle server address. When using an existing HA model, its endpoint and credentials are reused automatically.",
           "min_confidence": "Needle must approve every action above this threshold. Applies to both modes.",
@@ -35,8 +35,8 @@
       "cannot_connect": "Needle server is unreachable.",
       "invalid_response": "Invalid response from Needle server.",
       "invalid_url": "Enter a valid HTTP(S) server URL.",
-      "no_provider_models": "No supported loaded llama.cpp model integration is available.",
-      "invalid_provider_model": "Select an available loaded model."
+      "no_provider_models": "No compatible configured model is available (llama.cpp, Ollama, or OpenAI Conversation).",
+      "invalid_provider_model": "Select an available model from a supported integration."
     },
     "abort": {
       "already_configured": "This Needle server is already configured."
@@ -65,7 +65,7 @@
           "timeout": "Timeout per model request (seconds)"
         },
         "data_description": {
-          "provider_model": "A configured llama.cpp model. Server URL, credentials and model ID are reused automatically from Home Assistant.",
+          "provider_model": "Use an existing llama.cpp, Ollama, or OpenAI Conversation model. Its connection and credentials are reused.",
           "routing_strategy": "Both options require independent Needle approval. The existing HA model generates the final tool arguments.",
           "url": "Needle server address. When using an existing HA model, its endpoint and credentials are reused automatically.",
           "min_confidence": "Needle must approve every action above this threshold. Applies to both modes.",
@@ -77,8 +77,8 @@
       "cannot_connect": "Needle server is unreachable.",
       "invalid_response": "Invalid response from Needle server.",
       "invalid_url": "Enter a valid HTTP(S) server URL.",
-      "no_provider_models": "No supported loaded llama.cpp model integration is available.",
-      "invalid_provider_model": "Select an available loaded model."
+      "no_provider_models": "No compatible configured model is available (llama.cpp, Ollama, or OpenAI Conversation).",
+      "invalid_provider_model": "Select an available model from a supported integration."
     }
   }
 }

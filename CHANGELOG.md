@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0 - 2026-10-09
+
+- Add Ollama and OpenAI Conversation model provider adapters in addition to
+  the existing llama.cpp integration adapter, reusing HA's loaded clients.
+- Normalize native Ollama tool calls and OpenAI Responses function calls
+  into the same pre-execution validation pipeline.
+- Discover models by **capabilities and loaded conversation subentries**,
+  not by requiring HA 2026.10; older unsupported providers are hidden.
+- Hide the HA-model routing mode when no compatible provider is loaded.
+- Keep Needle-only routing functional on older HA versions; retain mandatory
+  Needle approval in all provider-backed routing modes.
+- Add regression tests for legacy entries, provider models, tool-call formats,
+  unavailable clients, and HA version-independent selection.
+
+
 ## 0.4.3 - 2026-10-08
 
 - Remove the model-only `openai_compatible` backend and associated client,

@@ -334,7 +334,7 @@ Assistant add-on.
 Current version:
 
 ```text
-0.4.3
+0.5.0
 ```
 
 ## License
@@ -359,8 +359,9 @@ used unchanged; low-confidence and suppressed Needle calls are never executed.
 The **HA model provider** mode reuses a previously configured Home Assistant
 conversation model instead of asking for another API URL, model name or key.
 
-**Current provider adapter:** Home Assistant's built-in `llama_cpp` integration
-(HA 2026.10); other integrations require separately tested adapters. The
+**Supported provider adapters:** Home Assistant's built-in `llama_cpp`,
+`ollama`, and `openai_conversation` integrations, wherever their currently
+loaded model client and conversation subentry APIs are compatible. The
 selected loaded config entry exposes an existing `AsyncOpenAI` client, and the
 selected conversation model is read from its HA config subentry. Only
 `entry_id:subentry_id` is stored in this integration. The model client is
@@ -369,13 +370,13 @@ upstream provider integration.
 
 ### Configure
 
-1. Configure the built-in **llama.cpp** integration and a conversation model
-   in Home Assistant first.
+1. Configure a compatible **llama.cpp**, **Ollama**, or **OpenAI Conversation**
+   integration with a conversation model in Home Assistant first.
 2. Install/update this integration, open **Settings → Devices & services →
    Needle LLM** and configure a new entry (or an existing Needle entry).
 3. Select backend **`ha_provider`**, supply the existing **Needle server URL**
    (Needle is still mandatory), choose **Existing Home Assistant model** from
-   the dropdown, and select one of:
+   the provider dropdown, and select one of:
    - **`needle_preselection`**: Needle proposes the native Assist tool.
    - **`model_preselection`**: the selected HA model proposes the tool.
 4. Set the **minimum Needle confidence** (default 0.8) and timeout, then save.
@@ -405,9 +406,8 @@ Needle routing or Needle plus an existing HA model provider. The old
 model-only backend was intentionally removed because it bypassed Needle.
 
 **Compatibility:** Selecting an arbitrary HA conversation agent cannot
-guarantee safe tool proposal interception. The initial adapter deliberately
-supports only loaded `llama_cpp` config/subentries with the known
-`runtime_data` client interface. Future providers will have individually
+guarantee safe tool proposal interception. Each supported provider uses its
+known loaded config entry/subentry interfaces and existing client methods. Future providers will have individually
 tested adapters instead of trying to invoke `conversation.process` and risk
 implicit tool execution or recursion.
 
@@ -427,7 +427,7 @@ Needle-powered modes. The second page displays **only settings relevant** to it:
 | Needle only | Needle URL, minimum Needle confidence, timeout |
 
 Provider-backed routing **never asks you to re-enter** your llama.cpp endpoint,
-API key or model ID. The provider picker reuses your configured HA model.
+API key or model ID. The provider picker reuses your existing HA conversation model.
 Switching modes preserves hidden settings, and all existing config entries stay
 compatible.
 
@@ -492,3 +492,61 @@ For a real `NeedleVerifiedRoute` invocation, the `routing_trace` field
 contains stage-by-stage tool proposals, Needle confidence/approval, model
 arguments, native HA target results, and durations; `diagnostics` retains
 the full raw details. Direct native HA calls are outside this routing trace.
+
+
+## Multiple existing HA model providers and older HA support (v0.5.0)
+
+The **Needle + existing Home Assistant model** mode can now reuse any loaded,
+compatible conversation subentry from the following built-in integrations:
+
+| Model integration | Existing client API | Model selection |
+| --- | --- | --- |
+| llama.cpp | OpenAI-compatible Chat Completions | `chat_model` in a conversation subentry |
+| Ollama | Native `ollama.AsyncClient.chat` | `model` in a conversation subentry |
+| OpenAI Conversation | OpenAI Responses API | `chat_model` in a conversation subentry |
+
+These are **provider adapters**, not extra Needle-bypassing modes. The model
+only proposes a tool or generates its arguments; **Needle still independently
+approves the selected action**. The native HA Assist permission checks and
+execution remain unchanged.
+
+### Automatic compatibility detection
+
+Provider discovery checks each running HA integration for:
+
+1. An enabled, **loaded** supported config entry.
+2. A `conversation` **config subentry** containing the model ID.
+3. A currently available, matching **model client API** on `runtime_data`.
+
+This is based on **runtime capabilities, not a hard-coded HA version check**.
+For example, Ollama and OpenAI Conversation gained compatible subentry-based
+configuration in HA 2025.7. On older versions without it, those entries are
+**not shown** in the model dropdown, and the provider-backed routing mode is
+hidden if **no compatible model** is available. Needle-only routing is always
+selectable. llama.cpp becomes available on HA installations that provide its
+built-in integration and compatible conversation subentries.
+
+If an existing configured model is removed, unloaded, disabled, or becomes
+incompatible following an HA upgrade, the router **fails closed**. It will not
+silently invoke a different provider or execute a native Assist action.
+An unavailable saved model is not offered as an apparently working option.
+
+The provider adapter reads the client from HA on every request. Provider
+URLs, authentication headers, API keys and passwords are **not copied** into
+Needle LLM's config entry. Other models and cloud providers may require
+provider-specific adapters; generic support must not be inferred merely from
+their advertised OpenAI compatibility.
+
+**Privacy:** Choosing OpenAI Conversation sends the prompt and relevant tool
+descriptions to OpenAI under that already configured HA account. Local
+llama.cpp/Ollama instances keep inference local if configured accordingly.
+
+### Compatibility policy
+
+- Keep the existing minimum HA compatibility and CI testing against
+  HA 2024.7, 2025.6, and 2026.10.
+- Dynamically hide unsupported providers on older versions rather than
+  forcing all users to update Home Assistant.
+- Add feature- and provider-specific regression tests. Avoid duplicating
+  service credentials or attempting to call a provider Conversation agent
+  through `conversation.process` (which may itself execute tools).
